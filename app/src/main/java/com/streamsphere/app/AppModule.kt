@@ -33,14 +33,15 @@ object AppModule {
     @Provides @Singleton
     fun provideRetrofit(client: OkHttpClient): Retrofit {
         val gson = GsonBuilder()
-            .setLenient()
-            .serializeSpecialFloatingPointValues()
-            .build()
+        .setLenient()
+        .build()
+        
         return Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create(gson))
-            .build()
+        .baseUrl(BASE_URL)
+        .client(client)
+        .addConverterFactory(GsonConverterFactory.create(gson))
+        .build()
+        
     }
 
     @Provides @Singleton
