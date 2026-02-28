@@ -40,8 +40,8 @@ class ChannelWidget : GlanceAppWidget() {
 private fun WidgetContent() {
 
     val backgroundColor = ColorProvider(
-        Color(0xFFFFFFFF),   // Light
-        Color(0xFF111827)    // Dark
+        Color(0xFFFFFFFF),
+        Color(0xFF111827)
     )
 
     val dividerColor = ColorProvider(
@@ -67,6 +67,7 @@ private fun WidgetContent() {
             .padding(12.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
+
         Column(modifier = GlanceModifier.fillMaxSize()) {
 
             Row(
@@ -85,12 +86,13 @@ private fun WidgetContent() {
 
             Spacer(modifier = GlanceModifier.height(6.dp))
 
+            // Divider
             Box(
                 modifier = GlanceModifier
                     .fillMaxWidth()
                     .height(1.dp)
                     .background(dividerColor)
-            )
+            ) {}
 
             Spacer(modifier = GlanceModifier.height(6.dp))
 
@@ -120,8 +122,8 @@ private fun WidgetRow(
 ) {
 
     val textColor = ColorProvider(
-        Color(0xFF111827),   // Light
-        Color(0xFFFFFFFF)    // Dark
+        Color(0xFF111827),
+        Color(0xFFFFFFFF)
     )
 
     Row(
@@ -137,7 +139,7 @@ private fun WidgetRow(
                 .height(5.dp)
                 .background(dot)
                 .cornerRadius(3.dp)
-        )
+        ) {}
 
         Spacer(modifier = GlanceModifier.width(6.dp))
 
