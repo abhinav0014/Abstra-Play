@@ -23,25 +23,23 @@ fun FavouritesScreen(
     onChannelClick: (String) -> Unit,
     viewModel: ChannelViewModel = hiltViewModel()
 ) {
-    val favourites   by viewModel.favourites.collectAsState()
-    val allChannels  by viewModel.filteredChannels.collectAsState()
+    val favourites     by viewModel.favourites.collectAsState()
+    val allChannels    by viewModel.filteredChannels.collectAsState()
     val widgetChannels by viewModel.widgetChannels.collectAsState()
 
-    // Map favourites to UI models using allChannels as source
     val favModels = remember(favourites, allChannels) {
         favourites.mapNotNull { fav ->
-            allChannels.find { it.id == fav.id }
-                ?: ChannelUiModel(
-                    id          = fav.id,
-                    name        = fav.name,
-                    country     = fav.country,
-                    countryFlag = "🌐",
-                    categories  = fav.categories.split(",").filter { it.isNotBlank() },
-                    logoUrl     = fav.logoUrl,
-                    streamUrl   = fav.streamUrl,
-                    isFavourite = true,
-                    isWidget    = fav.isWidget
-                )
+            allChannels.find { it.id == fav.id } ?: ChannelUiModel(
+                id          = fav.id,
+                name        = fav.name,
+                country     = fav.country,
+                countryFlag = "🌐",
+                categories  = fav.categories.split(",").filter { it.isNotBlank() },
+                logoUrl     = fav.logoUrl,
+                streamUrl   = fav.streamUrl,
+                isFavourite = true,
+                isWidget    = fav.isWidget
+            )
         }
     }
 
@@ -51,112 +49,43 @@ fun FavouritesScreen(
                 title = {
                     Column {
                         Text("Favourites", style = MaterialTheme.typography.headlineSmall)
-                        Text(
-                            "${favModels.size} channels saved",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("${favModels.size} channels saved", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
         if (favModels.isEmpty()) {
-            EmptyFavourites(modifier = Modifier.padding(padding))
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+                    Text("💜", style = MaterialTheme.typography.displayLarge)
+                    Spacer(Modifier.height(16.dp))
+                    Text("No favourites yet", style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Tap the heart icon on any channel to save it here.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                }
+            }
         } else {
             LazyColumn(
-                contentPadding = PaddingValues(
-                    start  = 16.dp,
-                    end    = 16.dp,
-                    top    = padding.calculateTopPadding() + 8.dp,
-                    bottom = 16.dp
-                ),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding() + 8.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Widget section
                 if (widgetChannels.isNotEmpty()) {
-                    item {
-                        Text(
-                            text  = "📱 Widget Channels",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-                    }
-                    items(
-                        items = widgetChannels,
-                        key   = { "widget_${it.id}" }
-                    ) { fav ->
+                    item { Text("📱 Widget Channels", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 4.dp)) }
+                    items(widgetChannels, key = { "widget_${it.id}" }) { fav ->
                         val model = favModels.find { it.id == fav.id } ?: return@items
-                        AnimatedVisibility(
-                            visible = true,
-                            enter   = fadeIn() + slideInHorizontally()
-                        ) {
-                            ChannelCard(
-                                model            = model,
-                                onFavouriteClick = { viewModel.toggleFavourite(model) },
-                                onWidgetClick    = { viewModel.toggleWidget(model) },
-                                onCardClick      = { onChannelClick(model.id) }
-                            )
-                        }
+                        ChannelCard(model = model, onFavouriteClick = { viewModel.toggleFavourite(model) }, onWidgetClick = { viewModel.toggleWidget(model) }, onCardClick = { onChannelClick(model.id) })
                     }
-                    item { Divider(modifier = Modifier.padding(vertical = 8.dp)) }
-                    item {
-                        Text(
-                            text  = "⭐ All Favourites",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-                    }
+                    item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp)) }
+                    item { Text("⭐ All Favourites", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 4.dp)) }
                 }
-
-                items(
-                    items = favModels,
-                    key   = { it.id }
-                ) { model ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter   = fadeIn() + slideInVertically()
-                    ) {
-                        ChannelCard(
-                            model            = model,
-                            onFavouriteClick = { viewModel.toggleFavourite(model) },
-                            onWidgetClick    = { viewModel.toggleWidget(model) },
-                            onCardClick      = { onChannelClick(model.id) }
-                        )
+                items(favModels, key = { it.id }) { model ->
+                    AnimatedVisibility(visible = true, enter = fadeIn() + slideInVertically()) {
+                        ChannelCard(model = model, onFavouriteClick = { viewModel.toggleFavourite(model) }, onWidgetClick = { viewModel.toggleWidget(model) }, onCardClick = { onChannelClick(model.id) })
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun EmptyFavourites(modifier: Modifier = Modifier) {
-    Box(
-        modifier          = modifier.fillMaxSize(),
-        contentAlignment  = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Text(text = "💜", style = MaterialTheme.typography.displayLarge)
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text      = "No favourites yet",
-                style     = MaterialTheme.typography.titleLarge,
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text      = "Tap the heart icon on any channel to save it here. You can also add channels to your home screen widget!",
-                style     = MaterialTheme.typography.bodyMedium,
-                color     = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
         }
     }
 }

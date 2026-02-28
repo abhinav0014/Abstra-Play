@@ -2,7 +2,6 @@ package com.streamsphere.app
 
 import android.content.Context
 import androidx.room.Room
-import com.google.gson.GsonBuilder
 import com.streamsphere.app.data.api.AppDatabase
 import com.streamsphere.app.data.api.IptvApi
 import dagger.Module
@@ -25,9 +24,7 @@ object AppModule {
     @Provides @Singleton
     fun provideOkHttp(): OkHttpClient =
         OkHttpClient.Builder()
-            .addInterceptor(HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BASIC
-            })
+            .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
             .build()
 
     @Provides @Singleton
@@ -36,11 +33,9 @@ object AppModule {
         .client(client)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
-        
 
     @Provides @Singleton
-    fun provideApi(retrofit: Retrofit): IptvApi =
-        retrofit.create(IptvApi::class.java)
+    fun provideApi(retrofit: Retrofit): IptvApi = retrofit.create(IptvApi::class.java)
 
     @Provides @Singleton
     fun provideDatabase(@ApplicationContext ctx: Context): AppDatabase =

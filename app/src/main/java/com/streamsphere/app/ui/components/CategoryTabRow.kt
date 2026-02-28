@@ -35,14 +35,11 @@ fun CategoryTabRow(
             val accentColor = tabColor(tab)
 
             val containerColor by animateColorAsState(
-                targetValue = if (isSelected) accentColor.copy(alpha = 0.15f)
-                              else Color.Transparent,
-                animationSpec = spring(),
-                label = "tab_container"
+                targetValue = if (isSelected) accentColor.copy(alpha = 0.15f) else Color.Transparent,
+                animationSpec = spring(), label = "tab_container"
             )
             val contentColor by animateColorAsState(
-                targetValue = if (isSelected) accentColor
-                              else MaterialTheme.colorScheme.onSurfaceVariant,
+                targetValue = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
                 label = "tab_content"
             )
 
@@ -55,15 +52,11 @@ fun CategoryTabRow(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(text = tab.emoji)
-                        Text(
-                            text  = tab.label,
-                            style = MaterialTheme.typography.labelLarge
-                        )
+                        Text(text = tab.label, style = MaterialTheme.typography.labelLarge)
                         counts[tab]?.let { count ->
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
-                                color = if (isSelected) accentColor.copy(0.2f)
-                                        else MaterialTheme.colorScheme.surfaceVariant
+                                color = if (isSelected) accentColor.copy(0.2f) else MaterialTheme.colorScheme.surfaceVariant
                             ) {
                                 Text(
                                     text     = count.toString(),
@@ -81,9 +74,9 @@ fun CategoryTabRow(
                     labelColor             = MaterialTheme.colorScheme.onSurfaceVariant
                 ),
                 border = FilterChipDefaults.filterChipBorder(
-                    enabled          = true,
-                    selected         = isSelected,
-                    borderColor      = MaterialTheme.colorScheme.outline.copy(0.4f),
+                    enabled             = true,
+                    selected            = isSelected,
+                    borderColor         = MaterialTheme.colorScheme.outline.copy(0.4f),
                     selectedBorderColor = accentColor.copy(0.4f)
                 )
             )

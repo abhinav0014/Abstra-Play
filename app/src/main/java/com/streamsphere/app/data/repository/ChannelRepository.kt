@@ -12,8 +12,6 @@ class ChannelRepository @Inject constructor(
     private val api: IptvApi,
     private val db: AppDatabase
 ) {
-    // ── Remote ────────────────────────────────────────────────────────────────
-
     private var cachedChannels: List<Channel>? = null
     private var cachedStreams: List<Stream>? = null
     private var cachedLogos: List<Logo>? = null
@@ -35,21 +33,18 @@ class ChannelRepository @Inject constructor(
         favouriteIds: Set<String> = emptySet(),
         widgetIds: Set<String> = emptySet()
     ): List<ChannelUiModel> {
-        val channels = getChannels()
+        val channels  = getChannels()
         val streams   = getStreams().groupBy { it.channel }
         val logos     = getLogos().groupBy { it.channel }
         val countries = getCountries().associateBy { it.code }
 
-        // Filter to target countries + science/music categories only
-        val targetCountries = setOf("NP", "IN")
+        val targetCountries  = setOf("NP", "IN")
         val targetCategories = setOf("science", "education", "music", "entertainment", "kids")
 
         return channels
             .filter { ch ->
-                !ch.isNsfw &&
-                ch.closed == null &&
-                (ch.country in targetCountries ||
-                 ch.categories.any { it in targetCategories })
+                !ch.isNsfw && ch.closed == null &&
+                (ch.country in targetCountries || ch.categories.any { it in targetCategories })
             }
             .map { ch ->
                 val country = countries[ch.country]
@@ -70,16 +65,9 @@ class ChannelRepository @Inject constructor(
             .distinctBy { it.id }
     }
 
-    // ── Local (Room) ──────────────────────────────────────────────────────────
-
-    fun getAllFavourites(): Flow<List<FavouriteChannel>> =
-        db.favouritesDao().getAllFavourites()
-
-    fun getWidgetChannels(): Flow<List<FavouriteChannel>> =
-        db.favouritesDao().getWidgetChannels()
-
-    fun isFavourite(id: String): Flow<Boolean> =
-        db.favouritesDao().isFavourite(id)
+    fun getAllFavourites(): Flow<List<FavouriteChannel>> = db.favouritesDao().getAllFavourites()
+    fun getWidgetChannels(): Flow<List<FavouriteChannel>> = db.favouritesDao().getWidgetChannels()
+    fun isFavourite(id: String): Flow<Boolean> = db.favouritesDao().isFavourite(id)
 
     suspend fun toggleFavourite(model: ChannelUiModel) {
         if (model.isFavourite) {

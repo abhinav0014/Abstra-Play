@@ -12,7 +12,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.streamsphere.app.data.model.ChannelTab
-import com.streamsphere.app.data.model.ChannelUiModel
 import com.streamsphere.app.ui.components.ChannelCard
 import com.streamsphere.app.viewmodel.ChannelViewModel
 
@@ -27,7 +26,6 @@ fun SearchScreen(
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        // Auto-show all when no query
         viewModel.selectTab(ChannelTab.ALL)
         focusRequester.requestFocus()
     }
@@ -35,10 +33,8 @@ fun SearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Discover", style = MaterialTheme.typography.headlineSmall) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                title  = { Text("Discover", style = MaterialTheme.typography.headlineSmall) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
@@ -46,34 +42,21 @@ fun SearchScreen(
             SearchBar(
                 query    = query,
                 onChange = viewModel::setSearchQuery,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .focusRequester(focusRequester)
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).focusRequester(focusRequester)
             )
-
-            AnimatedContent(
-                targetState = channels.isEmpty() && query.isNotBlank(),
-                label       = "search_content"
-            ) { noResults ->
+            AnimatedContent(targetState = channels.isEmpty() && query.isNotBlank(), label = "search_content") { noResults ->
                 if (noResults) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("🔍", style = MaterialTheme.typography.displayMedium)
                             Spacer(Modifier.height(12.dp))
-                            Text(
-                                text  = "No results for \"$query\"",
-                                style = MaterialTheme.typography.titleMedium
-                            )
+                            Text("No results for \"$query\"", style = MaterialTheme.typography.titleMedium)
                         }
                     }
                 } else {
                     LazyVerticalStaggeredGrid(
                         columns = StaggeredGridCells.Adaptive(340.dp),
-                        contentPadding = PaddingValues(
-                            start  = 16.dp,
-                            end    = 16.dp,
-                            bottom = 16.dp
-                        ),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalItemSpacing   = 12.dp
                     ) {

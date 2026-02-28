@@ -4,8 +4,6 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.google.gson.annotations.SerializedName
 
-// ─── API Models ───────────────────────────────────────────────────────────────
-
 data class Channel(
     @SerializedName("id") val id: String,
     @SerializedName("name") val name: String,
@@ -54,21 +52,17 @@ data class Country(
     @SerializedName("flag") val flag: String
 )
 
-// ─── Room Entity (Favourites) ─────────────────────────────────────────────────
-
 @Entity(tableName = "favourites")
 data class FavouriteChannel(
     @PrimaryKey val id: String,
     val name: String,
     val country: String,
-    val categories: String,      // JSON-serialized
+    val categories: String,
     val logoUrl: String? = null,
     val streamUrl: String? = null,
     val isWidget: Boolean = false,
     val addedAt: Long = System.currentTimeMillis()
 )
-
-// ─── UI State ─────────────────────────────────────────────────────────────────
 
 data class ChannelUiModel(
     val id: String,

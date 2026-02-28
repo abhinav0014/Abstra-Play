@@ -15,7 +15,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,13 +32,6 @@ fun ChannelCard(
     onCardClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    val scale by animateFloatAsState(
-        targetValue = 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "card_scale"
-    )
-
     val categoryColor = when {
         model.categories.any { it in listOf("music","entertainment") } -> MusicPurple
         model.categories.any { it in listOf("science","education","kids") } -> ScienceBlue
@@ -50,82 +42,36 @@ fun ChannelCard(
 
     Card(
         onClick = onCardClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .scale(scale),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 0.dp,
-            pressedElevation = 4.dp
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+        modifier = modifier.fillMaxWidth(),
+        shape    = RoundedCornerShape(16.dp),
+        colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp, pressedElevation = 4.dp),
+        border   = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Logo
-                LogoImage(
-                    logoUrl = model.logoUrl,
-                    name    = model.name,
-                    color   = categoryColor
-                )
-
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                LogoImage(logoUrl = model.logoUrl, name = model.name, color = categoryColor)
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text     = model.name,
-                        style    = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text(text = model.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text  = "${model.countryFlag} ${model.country}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text  = "${model.countryFlag} ${model.country}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-
-                // Favourite button
-                AnimatedFavButton(
-                    isFavourite = model.isFavourite,
-                    onClick     = onFavouriteClick
-                )
+                AnimatedFavButton(isFavourite = model.isFavourite, onClick = onFavouriteClick)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Category chips
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                model.categories.take(2).forEach { cat ->
-                    CategoryChip(cat, categoryColor)
-                }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                model.categories.take(2).forEach { cat -> CategoryChip(cat, categoryColor) }
                 Spacer(modifier = Modifier.weight(1f))
-
-                // Widget button
                 if (model.isFavourite) {
-                    AnimatedWidgetButton(
-                        isWidget = model.isWidget,
-                        onClick  = onWidgetClick
-                    )
+                    AnimatedWidgetButton(isWidget = model.isWidget, onClick = onWidgetClick)
                 }
-
-                // Stream indicator
-                if (model.streamUrl != null) {
-                    LiveBadge()
-                }
+                if (model.streamUrl != null) LiveBadge()
             }
         }
     }
@@ -143,19 +89,12 @@ fun LogoImage(logoUrl: String?, name: String, color: Color) {
     ) {
         if (logoUrl != null) {
             AsyncImage(
-                model             = logoUrl,
-                contentDescription = name,
-                contentScale      = ContentScale.Fit,
-                modifier          = Modifier
-                    .fillMaxSize()
-                    .padding(6.dp)
+                model = logoUrl, contentDescription = name,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().padding(6.dp)
             )
         } else {
-            Text(
-                text  = name.firstOrNull()?.toString() ?: "?",
-                style = MaterialTheme.typography.titleLarge,
-                color = color
-            )
+            Text(text = name.firstOrNull()?.toString() ?: "?", style = MaterialTheme.typography.titleLarge, color = color)
         }
     }
 }
@@ -163,17 +102,11 @@ fun LogoImage(logoUrl: String?, name: String, color: Color) {
 @Composable
 fun AnimatedFavButton(isFavourite: Boolean, onClick: () -> Unit) {
     val scale by animateFloatAsState(
-        targetValue = if (isFavourite) 1.2f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness    = Spring.StiffnessHigh
-        ),
-        label = "fav_scale"
+        targetValue   = if (isFavourite) 1.2f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+        label         = "fav_scale"
     )
-    IconButton(
-        onClick  = onClick,
-        modifier = Modifier.size(36.dp)
-    ) {
+    IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
         Icon(
             imageVector        = if (isFavourite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
             contentDescription = "Favourite",
@@ -189,10 +122,7 @@ fun AnimatedWidgetButton(isWidget: Boolean, onClick: () -> Unit) {
         targetValue = if (isWidget) Primary else MaterialTheme.colorScheme.onSurfaceVariant,
         label       = "widget_color"
     )
-    IconButton(
-        onClick  = onClick,
-        modifier = Modifier.size(28.dp)
-    ) {
+    IconButton(onClick = onClick, modifier = Modifier.size(28.dp)) {
         Icon(
             imageVector        = if (isWidget) Icons.Filled.Widgets else Icons.Outlined.Widgets,
             contentDescription = "Add to Widget",
@@ -230,23 +160,12 @@ fun LiveBadge() {
     ) {
         val infiniteTransition = rememberInfiniteTransition(label = "live_pulse")
         val alpha by infiniteTransition.animateFloat(
-            initialValue   = 1f,
-            targetValue    = 0.3f,
-            animationSpec  = infiniteRepeatable(
-                animation  = tween(800),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "live_alpha"
+            initialValue  = 1f,
+            targetValue   = 0.3f,
+            animationSpec = infiniteRepeatable(animation = tween(800), repeatMode = RepeatMode.Reverse),
+            label         = "live_alpha"
         )
-        Box(
-            modifier = Modifier
-                .size(5.dp)
-                .background(Color(0xFFE53E3E).copy(alpha = alpha), CircleShape)
-        )
-        Text(
-            text  = "LIVE",
-            style = MaterialTheme.typography.labelSmall,
-            color = Color(0xFFE53E3E)
-        )
+        Box(modifier = Modifier.size(5.dp).background(Color(0xFFE53E3E).copy(alpha = alpha), CircleShape))
+        Text(text = "LIVE", style = MaterialTheme.typography.labelSmall, color = Color(0xFFE53E3E))
     }
 }

@@ -91,11 +91,11 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
-    // ── Media3 / ExoPlayer (video playback) ───────────────────────────────────
+    // Media3 / ExoPlayer
     val media3Version = "1.3.1"
     implementation("androidx.media3:media3-exoplayer:$media3Version")
-    implementation("androidx.media3:media3-exoplayer-hls:$media3Version")   // HLS (.m3u8) support
-    implementation("androidx.media3:media3-ui:$media3Version")               // PlayerView
+    implementation("androidx.media3:media3-exoplayer-hls:$media3Version")
+    implementation("androidx.media3:media3-ui:$media3Version")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

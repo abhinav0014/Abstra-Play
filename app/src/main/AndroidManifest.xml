@@ -14,7 +14,6 @@
         android:theme="@style/Theme.StreamSphere"
         android:enableOnBackInvokedCallback="true">
 
-        <!-- Splash + Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -25,11 +24,10 @@
             </intent-filter>
         </activity>
 
-        <!-- Widget Provider -->
         <receiver
             android:name=".widget.ChannelWidgetReceiver"
             android:exported="true"
-            android:label="AbstraPlay Channel">
+            android:label="StreamSphere Channel">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

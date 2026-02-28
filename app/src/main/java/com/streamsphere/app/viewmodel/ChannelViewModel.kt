@@ -14,8 +14,6 @@ class ChannelViewModel @Inject constructor(
     private val repo: ChannelRepository
 ) : ViewModel() {
 
-    // ── State ─────────────────────────────────────────────────────────────────
-
     private val _uiState = MutableStateFlow<UiState<List<ChannelUiModel>>>(UiState.Loading)
     val uiState: StateFlow<UiState<List<ChannelUiModel>>> = _uiState.asStateFlow()
 
@@ -33,7 +31,6 @@ class ChannelViewModel @Inject constructor(
         repo.getWidgetChannels()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    // Derived filtered list
     val filteredChannels: StateFlow<List<ChannelUiModel>> =
         combine(_uiState, _selectedTab, _searchQuery, favourites, widgetChannels) {
             state, tab, query, favs, widgets ->
@@ -57,27 +54,21 @@ class ChannelViewModel @Inject constructor(
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    // ── Init ──────────────────────────────────────────────────────────────────
-
     init { loadChannels() }
 
     fun loadChannels() {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             runCatching {
-                val models = repo.buildChannelUiModels()
-                _uiState.value = UiState.Success(models)
+                _uiState.value = UiState.Success(repo.buildChannelUiModels())
             }.onFailure {
                 _uiState.value = UiState.Error(it.message ?: "Unknown error")
             }
         }
     }
 
-    // ── Actions ───────────────────────────────────────────────────────────────
-
     fun selectTab(tab: ChannelTab) { _selectedTab.value = tab }
-
-    fun setSearchQuery(q: String) { _searchQuery.value = q }
+    fun setSearchQuery(q: String)  { _searchQuery.value = q }
 
     fun toggleFavourite(model: ChannelUiModel) {
         viewModelScope.launch { repo.toggleFavourite(model) }
@@ -85,10 +76,7 @@ class ChannelViewModel @Inject constructor(
 
     fun toggleWidget(model: ChannelUiModel) {
         viewModelScope.launch {
-            if (!model.isFavourite) {
-                // Must be favourite first
-                repo.toggleFavourite(model)
-            }
+            if (!model.isFavourite) repo.toggleFavourite(model)
             repo.toggleWidget(model.id, model.isWidget)
         }
     }

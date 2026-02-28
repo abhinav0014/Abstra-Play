@@ -1,6 +1,5 @@
 package com.streamsphere.app
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -26,8 +25,8 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     companion object {
-        const val EXTRA_CHANNEL_ID  = "extra_channel_id"
-        const val EXTRA_STREAM_URL  = "extra_stream_url"
+        const val EXTRA_CHANNEL_ID = "extra_channel_id"
+        const val EXTRA_STREAM_URL = "extra_stream_url"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,29 +34,20 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Extract deep-link data from widget tap
-        val startChannelId  = intent?.getStringExtra(EXTRA_CHANNEL_ID)
-        val startStreamUrl  = intent?.getStringExtra(EXTRA_STREAM_URL)
+        val startChannelId = intent?.getStringExtra(EXTRA_CHANNEL_ID)
 
         setContent {
             StreamSphereTheme {
-                StreamSphereUI(
-                    startChannelId = startChannelId,
-                    startStreamUrl = startStreamUrl
-                )
+                StreamSphereUI(startChannelId = startChannelId)
             }
         }
     }
 }
 
 @Composable
-fun StreamSphereUI(
-    startChannelId: String? = null,
-    startStreamUrl: String? = null
-) {
+fun StreamSphereUI(startChannelId: String? = null) {
     val navController = rememberNavController()
 
-    // If launched from widget, navigate directly to detail (which will auto-play)
     LaunchedEffect(startChannelId) {
         if (!startChannelId.isNullOrBlank()) {
             navController.navigate(Screen.Detail.createRoute(startChannelId))
@@ -91,17 +81,15 @@ fun StreamSphereUI(
             }
             composable(
                 route     = Screen.Detail.route,
-                arguments = listOf(
-                    androidx.navigation.navArgument("channelId") {
-                        type = androidx.navigation.NavType.StringType
-                    }
-                )
+                arguments = listOf(androidx.navigation.navArgument("channelId") {
+                    type = androidx.navigation.NavType.StringType
+                })
             ) { backStack ->
                 val channelId = backStack.arguments?.getString("channelId") ?: return@composable
                 DetailScreen(
-                    channelId    = channelId,
-                    autoPlay     = channelId == startChannelId,
-                    onBack       = navController::popBackStack
+                    channelId = channelId,
+                    autoPlay  = channelId == startChannelId,
+                    onBack    = navController::popBackStack
                 )
             }
         }
@@ -110,19 +98,16 @@ fun StreamSphereUI(
 
 @Composable
 fun StreamSphereBottomBar(navController: androidx.navigation.NavHostController) {
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val navBackStackEntry  by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    val showBottomBar = currentDestination?.route != Screen.Detail.route
+    val showBottomBar      = currentDestination?.route != Screen.Detail.route
 
     AnimatedVisibility(
         visible = showBottomBar,
         enter   = slideInVertically { it } + fadeIn(),
         exit    = slideOutVertically { it } + fadeOut()
     ) {
-        NavigationBar(
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp
-        ) {
+        NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 8.dp) {
             bottomNavItems.forEach { item ->
                 val selected = currentDestination?.hierarchy?.any { it.route == item.screen.route } == true
                 NavigationBarItem(
@@ -134,12 +119,7 @@ fun StreamSphereBottomBar(navController: androidx.navigation.NavHostController) 
                             restoreState    = true
                         }
                     },
-                    icon  = {
-                        Icon(
-                            imageVector        = if (selected) item.selectedIcon else item.unselectedIcon,
-                            contentDescription = item.label
-                        )
-                    },
+                    icon   = { Icon(if (selected) item.selectedIcon else item.unselectedIcon, item.label) },
                     label  = { Text(item.label, style = MaterialTheme.typography.labelSmall) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor   = MaterialTheme.colorScheme.primary,

@@ -3,7 +3,6 @@ package com.streamsphere.app.ui.screens
 import android.net.Uri
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.annotation.OptIn
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -29,6 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -93,7 +93,7 @@ fun DetailScreen(
     }
 }
 
-@OptIn(UnstableApi::class)
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun DetailContent(
     channel: ChannelUiModel,
@@ -112,10 +112,9 @@ private fun DetailContent(
         else -> Primary
     }
 
-    // ── ExoPlayer setup ──────────────────────────────────────────────────────
     val hasStream = channel.streamUrl != null
-    var isPlaying by remember { mutableStateOf(autoPlay && hasStream) }
-    var playerError by remember { mutableStateOf<String?>(null) }
+    var isPlaying    by remember { mutableStateOf(autoPlay && hasStream) }
+    var playerError  by remember { mutableStateOf<String?>(null) }
 
     val exoPlayer = remember(channel.streamUrl) {
         if (channel.streamUrl == null) return@remember null
@@ -127,8 +126,8 @@ private fun DetailContent(
             prepare()
             playWhenReady = autoPlay
             addListener(object : Player.Listener {
-                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                    playerError = "Stream unavailable: ${error.message}"
+                override fun onPlayerError(error: PlaybackException) {
+                    playerError = "Stream unavailable"
                     isPlaying = false
                 }
                 override fun onIsPlayingChanged(playing: Boolean) {
@@ -138,7 +137,6 @@ private fun DetailContent(
         }
     }
 
-    // Lifecycle management for player
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -161,22 +159,18 @@ private fun DetailContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-
-        // ── Video Player / Thumbnail Card ────────────────────────────────────
+        // ── Player Card ───────────────────────────────────────────────────────
         Card(
             shape  = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.Black),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(0.4f))
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp),
+                modifier = Modifier.fillMaxWidth().height(220.dp),
                 contentAlignment = Alignment.Center
             ) {
                 if (hasStream && exoPlayer != null) {
                     if (isPlaying || autoPlay) {
-                        // Actual player view
                         AndroidView(
                             factory = { ctx ->
                                 PlayerView(ctx).apply {
@@ -192,42 +186,34 @@ private fun DetailContent(
                             modifier = Modifier.fillMaxSize()
                         )
                     } else {
-                        // Thumbnail / play button overlay
-                        if (channel.logoUrl != null) {
-                            AsyncImage(
-                                model              = channel.logoUrl,
-                                contentDescription = channel.name,
-                                contentScale       = ContentScale.Fit,
-                                modifier           = Modifier
-                                    .fillMaxSize()
-                                    .padding(32.dp)
-                            )
-                        } else {
-                            Text(channel.countryFlag, style = MaterialTheme.typography.displayLarge)
-                        }
-                        // Play button overlay
+                        // Thumbnail + play overlay
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.35f)),
+                                .background(categoryColor.copy(alpha = 0.08f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (channel.logoUrl != null) {
+                                AsyncImage(
+                                    model = channel.logoUrl,
+                                    contentDescription = channel.name,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize().padding(32.dp)
+                                )
+                            } else {
+                                Text(channel.countryFlag, style = MaterialTheme.typography.displayLarge)
+                            }
+                        }
+                        Box(
+                            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)),
                             contentAlignment = Alignment.Center
                         ) {
                             FilledIconButton(
-                                onClick = {
-                                    playerError = null
-                                    exoPlayer.playWhenReady = true
-                                    isPlaying = true
-                                },
+                                onClick = { playerError = null; exoPlayer.playWhenReady = true; isPlaying = true },
                                 modifier = Modifier.size(64.dp),
-                                colors   = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = categoryColor
-                                )
+                                colors   = IconButtonDefaults.filledIconButtonColors(containerColor = categoryColor)
                             ) {
-                                Icon(
-                                    imageVector        = Icons.Filled.PlayArrow,
-                                    contentDescription = "Play",
-                                    modifier           = Modifier.size(36.dp)
-                                )
+                                Icon(Icons.Filled.PlayArrow, contentDescription = "Play", modifier = Modifier.size(36.dp))
                             }
                         }
                     }
@@ -235,52 +221,37 @@ private fun DetailContent(
                     // Error overlay
                     playerError?.let { err ->
                         Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.7f)),
+                            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    Icons.Filled.ErrorOutline,
-                                    contentDescription = null,
-                                    tint     = Color(0xFFFC8181),
-                                    modifier = Modifier.size(36.dp)
-                                )
+                                Icon(Icons.Filled.ErrorOutline, null, tint = Color(0xFFFC8181), modifier = Modifier.size(36.dp))
                                 Spacer(Modifier.height(8.dp))
-                                Text(
-                                    text  = err,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White
-                                )
+                                Text(err, style = MaterialTheme.typography.bodySmall, color = Color.White)
+                                Spacer(Modifier.height(8.dp))
+                                TextButton(onClick = { playerError = null; exoPlayer.prepare(); isPlaying = true }) {
+                                    Text("Retry", color = Color.White)
+                                }
                             }
                         }
                     }
                 } else {
-                    // No stream available
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(categoryColor.copy(alpha = 0.08f)),
+                        modifier = Modifier.fillMaxSize().background(categoryColor.copy(alpha = 0.08f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             if (channel.logoUrl != null) {
                                 AsyncImage(
-                                    model              = channel.logoUrl,
-                                    contentDescription = channel.name,
-                                    contentScale       = ContentScale.Fit,
-                                    modifier           = Modifier.size(120.dp)
+                                    model = channel.logoUrl, contentDescription = channel.name,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.size(120.dp)
                                 )
                             } else {
                                 Text(channel.countryFlag, style = MaterialTheme.typography.displayLarge)
                             }
                             Spacer(Modifier.height(8.dp))
-                            Text(
-                                text  = "No stream available",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Text("No stream available", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -290,50 +261,27 @@ private fun DetailContent(
         // ── Channel info ──────────────────────────────────────────────────────
         Text(channel.name, style = MaterialTheme.typography.headlineMedium)
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment     = Alignment.CenterVertically
-        ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(channel.countryFlag, style = MaterialTheme.typography.titleLarge)
-            Text(
-                text  = channel.country,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (channel.streamUrl != null) {
-                LiveBadge()
-            }
+            Text(channel.country, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (channel.streamUrl != null) LiveBadge()
         }
 
-        // Categories
         if (channel.categories.isNotEmpty()) {
-            Text(
-                "Categories",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text("Categories", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 channel.categories.forEach { cat -> CategoryChip(cat, categoryColor) }
             }
         }
 
-        // ── Widget button ─────────────────────────────────────────────────────
+        // ── Widget toggle ─────────────────────────────────────────────────────
         OutlinedButton(
             onClick  = onWidget,
             modifier = Modifier.fillMaxWidth(),
-            border   = BorderStroke(
-                1.dp,
-                if (channel.isWidget) categoryColor else MaterialTheme.colorScheme.outline.copy(0.5f)
-            ),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = if (channel.isWidget) categoryColor
-                               else MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            border   = BorderStroke(1.dp, if (channel.isWidget) categoryColor else MaterialTheme.colorScheme.outline.copy(0.5f)),
+            colors   = ButtonDefaults.outlinedButtonColors(contentColor = if (channel.isWidget) categoryColor else MaterialTheme.colorScheme.onSurfaceVariant)
         ) {
-            Icon(
-                imageVector        = if (channel.isWidget) Icons.Filled.Widgets else Icons.Outlined.Widgets,
-                contentDescription = null
-            )
+            Icon(if (channel.isWidget) Icons.Filled.Widgets else Icons.Outlined.Widgets, null)
             Spacer(Modifier.width(8.dp))
             Text(if (channel.isWidget) "Remove from Widget" else "Add to Home Screen Widget")
         }
