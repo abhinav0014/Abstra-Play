@@ -1,0 +1,39 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Gradient background -->
+    <path
+        android:fillColor="#080C14"
+        android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
+
+    <!-- TV Screen body -->
+    <path
+        android:fillColor="#4F8EF7"
+        android:pathData="M14,26 Q14,20 20,20 L88,20 Q94,20 94,26 L94,72 Q94,78 88,78 L20,78 Q14,78 14,72 Z" />
+
+    <!-- TV Screen inner -->
+    <path
+        android:fillColor="#111827"
+        android:pathData="M20,30 Q20,26 24,26 L84,26 Q88,26 88,30 L88,68 Q88,72 84,72 L24,72 Q20,72 20,68 Z" />
+
+    <!-- Play button -->
+    <path
+        android:fillColor="#4F8EF7"
+        android:pathData="M42,40 L42,64 L72,52 Z" />
+
+    <!-- Stand -->
+    <path
+        android:fillColor="#4F8EF7"
+        android:pathData="M48,78 L60,78 L64,88 L44,88 Z" />
+    <path
+        android:fillColor="#4F8EF7"
+        android:pathData="M34,88 Q34,84 38,84 L70,84 Q74,84 74,88 L74,90 Q74,92 70,92 L38,92 Q34,92 34,90 Z" />
+
+    <!-- Live red dot -->
+    <path
+        android:fillColor="#E53E3E"
+        android:pathData="M80,34 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+</vector>

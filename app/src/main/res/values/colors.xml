@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background">#FF080C14</color>
+    <color name="surface">#FF111827</color>
+    <color name="primary">#FF4F8EF7</color>
+    <color name="secondary">#FFB76EF7</color>
+    <color name="accent_nepal">#FFE53E3E</color>
+    <color name="accent_india">#FFF6A623</color>
+    <color name="accent_science">#FF5A9FD4</color>
+    <color name="accent_music">#FFB76EF7</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

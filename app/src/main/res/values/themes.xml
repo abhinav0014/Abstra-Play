@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base app theme -->
+    <style name="Theme.StreamSphere" parent="android:Theme.Material.NoTitleBar">
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/surface</item>
+    </style>
+
+    <!-- Splash screen theme -->
+    <style name="Theme.StreamSphere.Splash" parent="Theme.SplashScreen">
+        <!-- Background color of the splash screen -->
+        <item name="windowSplashScreenBackground">@color/background</item>
+        <!-- The animated icon or static icon -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <!-- Duration of icon animation if animated -->
+        <item name="windowSplashScreenAnimationDuration">1000</item>
+        <!-- Keep screen shown condition -->
+        <item name="postSplashScreenTheme">@style/Theme.StreamSphere</item>
+    </style>
+
+</resources>
