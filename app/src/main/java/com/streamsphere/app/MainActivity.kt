@@ -1,5 +1,6 @@
 package com.streamsphere.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -25,76 +25,70 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        // Install splash screen BEFORE super.onCreate
-        installSplashScreen()
+    companion object {
+        const val EXTRA_CHANNEL_ID  = "extra_channel_id"
+        const val EXTRA_STREAM_URL  = "extra_stream_url"
+    }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Extract deep-link data from widget tap
+        val startChannelId  = intent?.getStringExtra(EXTRA_CHANNEL_ID)
+        val startStreamUrl  = intent?.getStringExtra(EXTRA_STREAM_URL)
+
         setContent {
             StreamSphereTheme {
-                StreamSphereUI()
+                StreamSphereUI(
+                    startChannelId = startChannelId,
+                    startStreamUrl = startStreamUrl
+                )
             }
         }
     }
 }
 
 @Composable
-fun StreamSphereUI() {
+fun StreamSphereUI(
+    startChannelId: String? = null,
+    startStreamUrl: String? = null
+) {
     val navController = rememberNavController()
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        bottomBar = {
-            StreamSphereBottomBar(navController)
+    // If launched from widget, navigate directly to detail (which will auto-play)
+    LaunchedEffect(startChannelId) {
+        if (!startChannelId.isNullOrBlank()) {
+            navController.navigate(Screen.Detail.createRoute(startChannelId))
         }
+    }
+
+    Scaffold(
+        modifier  = Modifier.fillMaxSize(),
+        bottomBar = { StreamSphereBottomBar(navController) }
     ) { innerPadding ->
         NavHost(
             navController    = navController,
             startDestination = Screen.Home.route,
             modifier         = Modifier.padding(innerPadding),
-            enterTransition  = {
-                fadeIn(tween(220)) + slideInHorizontally(tween(220)) { it / 10 }
-            },
-            exitTransition   = {
-                fadeOut(tween(180)) + slideOutHorizontally(tween(180)) { -it / 10 }
-            },
-            popEnterTransition = {
-                fadeIn(tween(220)) + slideInHorizontally(tween(220)) { -it / 10 }
-            },
-            popExitTransition  = {
-                fadeOut(tween(180)) + slideOutHorizontally(tween(180)) { it / 10 }
-            }
+            enterTransition  = { fadeIn(tween(220)) + slideInHorizontally(tween(220)) { it / 10 } },
+            exitTransition   = { fadeOut(tween(180)) + slideOutHorizontally(tween(180)) { -it / 10 } },
+            popEnterTransition  = { fadeIn(tween(220)) + slideInHorizontally(tween(220)) { -it / 10 } },
+            popExitTransition   = { fadeOut(tween(180)) + slideOutHorizontally(tween(180)) { it / 10 } }
         ) {
             composable(Screen.Home.route) {
-                HomeScreen(
-                    onChannelClick = { id ->
-                        navController.navigate(Screen.Detail.createRoute(id))
-                    }
-                )
+                HomeScreen(onChannelClick = { id -> navController.navigate(Screen.Detail.createRoute(id)) })
             }
-
             composable(Screen.Search.route) {
-                SearchScreen(
-                    onChannelClick = { id ->
-                        navController.navigate(Screen.Detail.createRoute(id))
-                    }
-                )
+                SearchScreen(onChannelClick = { id -> navController.navigate(Screen.Detail.createRoute(id)) })
             }
-
             composable(Screen.Favourites.route) {
-                FavouritesScreen(
-                    onChannelClick = { id ->
-                        navController.navigate(Screen.Detail.createRoute(id))
-                    }
-                )
+                FavouritesScreen(onChannelClick = { id -> navController.navigate(Screen.Detail.createRoute(id)) })
             }
-
             composable(Screen.Settings.route) {
                 SettingsScreen()
             }
-
             composable(
                 route     = Screen.Detail.route,
                 arguments = listOf(
@@ -105,8 +99,9 @@ fun StreamSphereUI() {
             ) { backStack ->
                 val channelId = backStack.arguments?.getString("channelId") ?: return@composable
                 DetailScreen(
-                    channelId = channelId,
-                    onBack    = navController::popBackStack
+                    channelId    = channelId,
+                    autoPlay     = channelId == startChannelId,
+                    onBack       = navController::popBackStack
                 )
             }
         }
@@ -117,8 +112,6 @@ fun StreamSphereUI() {
 fun StreamSphereBottomBar(navController: androidx.navigation.NavHostController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-
-    // Hide bottom bar on detail screen
     val showBottomBar = currentDestination?.route != Screen.Detail.route
 
     AnimatedVisibility(
@@ -131,28 +124,23 @@ fun StreamSphereBottomBar(navController: androidx.navigation.NavHostController) 
             tonalElevation = 8.dp
         ) {
             bottomNavItems.forEach { item ->
-                val selected = currentDestination?.hierarchy?.any {
-                    it.route == item.screen.route
-                } == true
-
+                val selected = currentDestination?.hierarchy?.any { it.route == item.screen.route } == true
                 NavigationBarItem(
                     selected = selected,
                     onClick  = {
                         navController.navigate(item.screen.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
                             restoreState    = true
                         }
                     },
-                    icon = {
+                    icon  = {
                         Icon(
                             imageVector        = if (selected) item.selectedIcon else item.unselectedIcon,
                             contentDescription = item.label
                         )
                     },
-                    label = { Text(item.label, style = MaterialTheme.typography.labelSmall) },
+                    label  = { Text(item.label, style = MaterialTheme.typography.labelSmall) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor   = MaterialTheme.colorScheme.primary,
                         selectedTextColor   = MaterialTheme.colorScheme.primary,

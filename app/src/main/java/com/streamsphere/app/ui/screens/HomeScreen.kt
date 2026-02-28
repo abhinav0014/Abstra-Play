@@ -13,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -27,13 +26,13 @@ fun HomeScreen(
     onChannelClick: (String) -> Unit,
     viewModel: ChannelViewModel = hiltViewModel()
 ) {
-    val uiState       by viewModel.uiState.collectAsState()
-    val selectedTab   by viewModel.selectedTab.collectAsState()
-    val searchQuery   by viewModel.searchQuery.collectAsState()
-    val channels      by viewModel.filteredChannels.collectAsState()
+    val uiState     by viewModel.uiState.collectAsState()
+    val selectedTab by viewModel.selectedTab.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val channels    by viewModel.filteredChannels.collectAsState()
 
     val topBarScrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val pullRefreshState = rememberPullToRefreshState()
+    val pullRefreshState     = rememberPullToRefreshState()
 
     if (pullRefreshState.isRefreshing) {
         LaunchedEffect(Unit) {
@@ -44,13 +43,16 @@ fun HomeScreen(
 
     Scaffold(
         topBar = {
+            // LargeTopAppBar: title collapses on scroll; Refresh is in actions (top-right)
             LargeTopAppBar(
                 title = {
+                    // When expanded shows two lines; when collapsed shows just the app name
                     Column {
                         Text(
                             text  = "StreamSphere",
                             style = MaterialTheme.typography.headlineMedium
                         )
+                        // Only visible while expanded
                         Text(
                             text  = "Global TV Channels",
                             style = MaterialTheme.typography.bodyMedium,
@@ -58,14 +60,18 @@ fun HomeScreen(
                         )
                     }
                 },
+                // Refresh lives here — always visible in the top-right corner
                 actions = {
                     IconButton(onClick = { viewModel.loadChannels() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
+                        Icon(
+                            imageVector        = Icons.Filled.Refresh,
+                            contentDescription = "Refresh channels"
+                        )
                     }
                 },
                 scrollBehavior = topBarScrollBehavior,
                 colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor       = MaterialTheme.colorScheme.background,
+                    containerColor         = MaterialTheme.colorScheme.background,
                     scrolledContainerColor = MaterialTheme.colorScheme.surface
                 )
             )
@@ -79,23 +85,23 @@ fun HomeScreen(
                 .padding(padding)
                 .nestedScroll(pullRefreshState.nestedScrollConnection)
         ) {
-            when (uiState) {
+            when (val state = uiState) {
                 is UiState.Loading -> LoadingContent()
                 is UiState.Error   -> ErrorContent(
-                    message   = (uiState as UiState.Error).message,
-                    onRetry   = viewModel::loadChannels
+                    message = state.message,
+                    onRetry = viewModel::loadChannels
                 )
                 is UiState.Success -> {
                     ChannelListContent(
-                        channels       = channels,
-                        selectedTab    = selectedTab,
-                        searchQuery    = searchQuery,
-                        allChannels    = (uiState as UiState.Success).data,
-                        onTabSelected  = viewModel::selectTab,
-                        onSearchQuery  = viewModel::setSearchQuery,
-                        onFavourite    = viewModel::toggleFavourite,
-                        onWidget       = viewModel::toggleWidget,
-                        onCardClick    = onChannelClick
+                        channels      = channels,
+                        selectedTab   = selectedTab,
+                        searchQuery   = searchQuery,
+                        allChannels   = state.data,
+                        onTabSelected = viewModel::selectTab,
+                        onSearchQuery = viewModel::setSearchQuery,
+                        onFavourite   = viewModel::toggleFavourite,
+                        onWidget      = viewModel::toggleWidget,
+                        onCardClick   = onChannelClick
                     )
                 }
             }
@@ -120,7 +126,6 @@ private fun ChannelListContent(
     onWidget: (ChannelUiModel) -> Unit,
     onCardClick: (String) -> Unit
 ) {
-    // Compute counts per tab
     val counts = remember(allChannels) {
         ChannelTab.entries.associateWith { tab ->
             allChannels.count { ch ->
@@ -128,20 +133,19 @@ private fun ChannelListContent(
                     ChannelTab.ALL     -> true
                     ChannelTab.NEPAL   -> ch.country.contains("Nepal", ignoreCase = true)
                     ChannelTab.INDIA   -> ch.country.contains("India", ignoreCase = true)
-                    ChannelTab.SCIENCE -> ch.categories.any { it in listOf("science","education","kids") }
-                    ChannelTab.MUSIC   -> ch.categories.any { it in listOf("music","entertainment") }
+                    ChannelTab.SCIENCE -> ch.categories.any { it in listOf("science", "education", "kids") }
+                    ChannelTab.MUSIC   -> ch.categories.any { it in listOf("music", "entertainment") }
                 }
             }
         }
     }
 
     LazyVerticalStaggeredGrid(
-        columns             = StaggeredGridCells.Adaptive(340.dp),
-        contentPadding      = PaddingValues(bottom = 16.dp),
+        columns               = StaggeredGridCells.Adaptive(340.dp),
+        contentPadding        = PaddingValues(bottom = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalItemSpacing = 12.dp
+        verticalItemSpacing   = 12.dp
     ) {
-        // Search bar
         item(span = StaggeredGridItemSpan.FullLine) {
             SearchBar(
                 query    = searchQuery,
@@ -150,7 +154,6 @@ private fun ChannelListContent(
             )
         }
 
-        // Tab row
         item(span = StaggeredGridItemSpan.FullLine) {
             CategoryTabRow(
                 selectedTab   = selectedTab,
@@ -160,7 +163,6 @@ private fun ChannelListContent(
             )
         }
 
-        // Results count
         item(span = StaggeredGridItemSpan.FullLine) {
             Text(
                 text     = "${channels.size} channels",
@@ -171,9 +173,7 @@ private fun ChannelListContent(
         }
 
         if (channels.isEmpty()) {
-            item(span = StaggeredGridItemSpan.FullLine) {
-                EmptyContent()
-            }
+            item(span = StaggeredGridItemSpan.FullLine) { EmptyContent() }
         } else {
             itemsIndexed(
                 items = channels,
@@ -190,10 +190,10 @@ private fun ChannelListContent(
                     )
                 ) {
                     ChannelCard(
-                        model           = ch,
+                        model            = ch,
                         onFavouriteClick = { onFavourite(ch) },
-                        onWidgetClick   = { onWidget(ch) },
-                        onCardClick     = { onCardClick(ch.id) }
+                        onWidgetClick    = { onWidget(ch) },
+                        onCardClick      = { onCardClick(ch.id) }
                     )
                 }
             }
@@ -248,7 +248,10 @@ private fun LoadingContent() {
 @Composable
 private fun ErrorContent(message: String, onRetry: () -> Unit) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier            = Modifier.padding(32.dp)
+        ) {
             Icon(
                 imageVector        = Icons.Filled.WifiOff,
                 contentDescription = null,
@@ -281,9 +284,7 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
 @Composable
 private fun EmptyContent() {
     Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = 60.dp),
+        Modifier.fillMaxWidth().padding(top = 60.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
