@@ -37,7 +37,6 @@ object AppModule {
         .addConverterFactory(GsonConverterFactory.create(gson))
         .build()
         
-    }
 
     @Provides @Singleton
     fun provideApi(retrofit: Retrofit): IptvApi =
