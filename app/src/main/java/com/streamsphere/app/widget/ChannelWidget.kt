@@ -13,11 +13,11 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.cornerRadius
+import androidx.glance.color.ColorProvider
 import androidx.glance.layout.*
 import androidx.glance.text.*
 import com.streamsphere.app.MainActivity
-import androidx.glance.appwidget.cornerRadius
-import androidx.glance.color.ColorProvider
 
 class ChannelWidget : GlanceAppWidget() {
 
@@ -31,32 +31,32 @@ class ChannelWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
-            WidgetContent(context)
+            WidgetContent()
         }
     }
 }
 
 @Composable
-private fun WidgetContent(context: Context) {
+private fun WidgetContent() {
 
     val backgroundColor = ColorProvider(
-        day = Color(0xFFFFFFFF),
-        night = Color(0xFF111827)
+        Color(0xFFFFFFFF),   // Light
+        Color(0xFF111827)    // Dark
     )
 
     val dividerColor = ColorProvider(
-        day = Color(0xFFE5E7EB),
-        night = Color(0xFF1A2235)
+        Color(0xFFE5E7EB),
+        Color(0xFF1A2235)
     )
 
     val primaryTextColor = ColorProvider(
-        day = Color(0xFF111827),
-        night = Color(0xFFFFFFFF)
+        Color(0xFF111827),
+        Color(0xFFFFFFFF)
     )
 
     val secondaryTextColor = ColorProvider(
-        day = Color(0xFF4B5563),
-        night = Color(0xFF6B7A99)
+        Color(0xFF4B5563),
+        Color(0xFF6B7A99)
     )
 
     Box(
@@ -90,19 +90,19 @@ private fun WidgetContent(context: Context) {
                     .fillMaxWidth()
                     .height(1.dp)
                     .background(dividerColor)
-            ) {}
+            )
 
             Spacer(modifier = GlanceModifier.height(6.dp))
 
-            WidgetRow("🇳🇵", "NTV Nepal", Color(0xFFFC8181), primaryTextColor)
-            WidgetRow("🇮🇳", "DD National", Color(0xFFFBD38D), primaryTextColor)
-            WidgetRow("🔬", "Discovery Science", Color(0xFF90CDF4), primaryTextColor)
-            WidgetRow("🎵", "MTV", Color(0xFFD6BCFA), primaryTextColor)
+            WidgetRow("🇳🇵", "NTV Nepal", Color(0xFFFC8181))
+            WidgetRow("🇮🇳", "DD National", Color(0xFFFBD38D))
+            WidgetRow("🔬", "Discovery Science", Color(0xFF90CDF4))
+            WidgetRow("🎵", "MTV", Color(0xFFD6BCFA))
 
             Spacer(modifier = GlanceModifier.defaultWeight())
 
             Text(
-                "Tap to open →",
+                text = "Tap to open →",
                 style = TextStyle(
                     fontSize = 9.sp,
                     color = secondaryTextColor
@@ -116,22 +116,28 @@ private fun WidgetContent(context: Context) {
 private fun WidgetRow(
     flag: String,
     name: String,
-    dot: Color,
-    textColor: ColorProvider
+    dot: Color
 ) {
+
+    val textColor = ColorProvider(
+        Color(0xFF111827),   // Light
+        Color(0xFFFFFFFF)    // Dark
+    )
+
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()
             .padding(bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+
         Box(
             modifier = GlanceModifier
                 .width(5.dp)
                 .height(5.dp)
                 .background(dot)
                 .cornerRadius(3.dp)
-        ) {}
+        )
 
         Spacer(modifier = GlanceModifier.width(6.dp))
 
