@@ -35,8 +35,8 @@ data class Logo(
     @SerializedName("channel") val channel: String,
     @SerializedName("feed") val feed: String? = null,
     @SerializedName("tags") val tags: List<String> = emptyList(),
-    @SerializedName("width") val width: Double = 0,
-    @SerializedName("height") val height: Double = 0,
+    @SerializedName("width") val width: Double = 0.0,
+    @SerializedName("height") val height: Double = 0.0,
     @SerializedName("format") val format: String? = null,
     @SerializedName("url") val url: String
 )
