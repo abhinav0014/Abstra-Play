@@ -31,12 +31,7 @@ object AppModule {
             .build()
 
     @Provides @Singleton
-    fun provideRetrofit(client: OkHttpClient): Retrofit {
-        val gson = GsonBuilder()
-        .setLenient()
-        .build()
-        
-        return Retrofit.Builder()
+    fun provideRetrofit(client: OkHttpClient): Retrofit = Retrofit.Builder()
         .baseUrl(BASE_URL)
         .client(client)
         .addConverterFactory(GsonConverterFactory.create(gson))
