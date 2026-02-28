@@ -38,47 +38,111 @@ class ChannelWidget : GlanceAppWidget() {
 
 @Composable
 private fun WidgetContent(context: Context) {
+
+    val backgroundColor = ColorProvider(
+        day = Color(0xFFFFFFFF),
+        night = Color(0xFF111827)
+    )
+
+    val dividerColor = ColorProvider(
+        day = Color(0xFFE5E7EB),
+        night = Color(0xFF1A2235)
+    )
+
+    val primaryTextColor = ColorProvider(
+        day = Color(0xFF111827),
+        night = Color(0xFFFFFFFF)
+    )
+
+    val secondaryTextColor = ColorProvider(
+        day = Color(0xFF4B5563),
+        night = Color(0xFF6B7A99)
+    )
+
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(Color(0xFF111827))
+            .background(backgroundColor)
             .cornerRadius(16.dp)
             .padding(12.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
         Column(modifier = GlanceModifier.fillMaxSize()) {
+
             Row(
                 modifier = GlanceModifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "📺 StreamSphere",
+                Text(
+                    text = "📺 StreamSphere",
                     style = TextStyle(
                         fontWeight = FontWeight.Bold,
-                        fontSize   = 12.sp,
-                        color      = ColorProvider(Color.White)
-                    ))
+                        fontSize = 12.sp,
+                        color = primaryTextColor
+                    )
+                )
             }
+
             Spacer(modifier = GlanceModifier.height(6.dp))
-            Box(modifier = GlanceModifier.fillMaxWidth().height(1.dp).background(Color(0xFF1A2235))){}
+
+            Box(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(dividerColor)
+            ) {}
+
             Spacer(modifier = GlanceModifier.height(6.dp))
-            WidgetRow("🇳🇵", "NTV Nepal",        Color(0xFFFC8181))
-            WidgetRow("🇮🇳", "DD National",       Color(0xFFFBD38D))
-            WidgetRow("🔬", "Discovery Science",  Color(0xFF90CDF4))
-            WidgetRow("🎵", "MTV",                Color(0xFFD6BCFA))
+
+            WidgetRow("🇳🇵", "NTV Nepal", Color(0xFFFC8181), primaryTextColor)
+            WidgetRow("🇮🇳", "DD National", Color(0xFFFBD38D), primaryTextColor)
+            WidgetRow("🔬", "Discovery Science", Color(0xFF90CDF4), primaryTextColor)
+            WidgetRow("🎵", "MTV", Color(0xFFD6BCFA), primaryTextColor)
+
             Spacer(modifier = GlanceModifier.defaultWeight())
-            Text("Tap to open →",
-                style = TextStyle(fontSize = 9.sp, color = ColorProvider(Color(0xFF6B7A99))))
+
+            Text(
+                "Tap to open →",
+                style = TextStyle(
+                    fontSize = 9.sp,
+                    color = secondaryTextColor
+                )
+            )
         }
     }
 }
 
 @Composable
-private fun WidgetRow(flag: String, name: String, dot: Color) {
-    Row(modifier = GlanceModifier.fillMaxWidth().padding(bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = GlanceModifier.width(5.dp).height(5.dp).background(dot).cornerRadius(3.dp)){}
+private fun WidgetRow(
+    flag: String,
+    name: String,
+    dot: Color,
+    textColor: ColorProvider
+) {
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .width(5.dp)
+                .height(5.dp)
+                .background(dot)
+                .cornerRadius(3.dp)
+        ) {}
+
         Spacer(modifier = GlanceModifier.width(6.dp))
-        Text("$flag $name", style = TextStyle(fontSize = 11.sp, color = ColorProvider(Color.White)), maxLines = 1)
+
+        Text(
+            text = "$flag $name",
+            style = TextStyle(
+                fontSize = 11.sp,
+                color = textColor
+            ),
+            maxLines = 1
+        )
     }
 }
 
