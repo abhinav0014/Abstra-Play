@@ -75,7 +75,7 @@ private fun WidgetContent() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "📺 StreamSphere",
+                    text = "📺 AbstraPlay",
                     style = TextStyle(
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,

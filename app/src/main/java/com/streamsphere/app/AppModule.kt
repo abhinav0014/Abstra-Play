@@ -2,6 +2,7 @@ package com.streamsphere.app
 
 import android.content.Context
 import androidx.room.Room
+import com.google.gson.GsonBuilder
 import com.streamsphere.app.data.api.AppDatabase
 import com.streamsphere.app.data.api.IptvApi
 import dagger.Module
@@ -30,12 +31,17 @@ object AppModule {
             .build()
 
     @Provides @Singleton
-    fun provideRetrofit(client: OkHttpClient): Retrofit =
-        Retrofit.Builder()
+    fun provideRetrofit(client: OkHttpClient): Retrofit {
+        val gson = GsonBuilder()
+            .setLenient()
+            .serializeSpecialFloatingPointValues()
+            .build()
+        return Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
+    }
 
     @Provides @Singleton
     fun provideApi(retrofit: Retrofit): IptvApi =
