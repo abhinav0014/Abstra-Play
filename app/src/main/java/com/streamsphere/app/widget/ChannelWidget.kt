@@ -67,14 +67,15 @@ private fun WidgetContent(context: Context, channels: List<FavouriteChannel>) {
     val primaryText     = ColorProvider(Color(0xFF111827), Color(0xFFFFFFFF))
     val secondaryText   = ColorProvider(Color(0xFF4B5563), Color(0xFF6B7A99))
     val dotColors = listOf(Color(0xFFFC8181), Color(0xFFFBD38D), Color(0xFF90CDF4), Color(0xFFD6BCFA))
-
+    
+    val intent = Intent(context, MainActivity::class.java)
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(backgroundColor)
             .cornerRadius(16.dp)
             .padding(12.dp)
-            .clickable(actionStartActivity<MainActivity>())
+            .clickable(actionStartActivity(intent))
     ) {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
