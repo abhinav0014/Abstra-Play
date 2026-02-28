@@ -16,6 +16,8 @@ import androidx.glance.appwidget.provideContent
 import androidx.glance.layout.*
 import androidx.glance.text.*
 import com.streamsphere.app.MainActivity
+import androidx.glance.appwidget.cornerRadius
+import androidx.glance.appwidget.ColorProvider
 
 class ChannelWidget : GlanceAppWidget() {
 

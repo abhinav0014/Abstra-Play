@@ -33,14 +33,14 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             StreamSphereTheme {
-                StreamSphereApp()
+                StreamSphereUI()
             }
         }
     }
 }
 
 @Composable
-fun StreamSphereApp() {
+fun StreamSphereUI() {
     val navController = rememberNavController()
 
     Scaffold(
