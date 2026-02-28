@@ -2,14 +2,8 @@ package com.streamsphere.app.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.streamsphere.app.R
-
-// Using bundled fonts (add to res/font/ folder)
-// For now use system default with custom weights
 val AppTypography = Typography(
     displayLarge = TextStyle(
         fontWeight = FontWeight.ExtraBold,
