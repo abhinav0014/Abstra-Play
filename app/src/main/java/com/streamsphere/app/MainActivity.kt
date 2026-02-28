@@ -127,7 +127,7 @@ fun StreamSphereBottomBar(navController: androidx.navigation.NavHostController) 
     ) {
         NavigationBar(
             containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = androidx.compose.ui.unit.Dp.Unspecified
+            tonalElevation = 0.dp
         ) {
             bottomNavItems.forEach { item ->
                 val selected = currentDestination?.hierarchy?.any {
