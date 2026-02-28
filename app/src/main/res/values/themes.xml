@@ -2,7 +2,7 @@
 <resources>
 
     <!-- Base app theme -->
-    <style name="Theme.StreamSphere" parent="android:Theme.Material.NoTitleBar">
+    <android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/background</item>
         <item name="android:statusBarColor">@color/background</item>
         <item name="android:navigationBarColor">@color/surface</item>
