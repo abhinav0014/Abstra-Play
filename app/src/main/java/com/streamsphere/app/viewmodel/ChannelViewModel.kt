@@ -17,11 +17,17 @@ class ChannelViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<UiState<List<ChannelUiModel>>>(UiState.Loading)
     val uiState: StateFlow<UiState<List<ChannelUiModel>>> = _uiState.asStateFlow()
 
-    private val _selectedTab = MutableStateFlow(ChannelTab.ALL)
+    private val _selectedTab   = MutableStateFlow(ChannelTab.ALL)
     val selectedTab: StateFlow<ChannelTab> = _selectedTab.asStateFlow()
 
-    private val _searchQuery = MutableStateFlow("")
+    private val _searchQuery   = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    /**
+     * Stores user-chosen stream index per channel id.
+     * Survives tab/search changes without re-fetching.
+     */
+    private val _streamSelections = MutableStateFlow<Map<String, Int>>(emptyMap())
 
     val favourites: StateFlow<List<FavouriteChannel>> =
         repo.getAllFavourites()
@@ -32,13 +38,19 @@ class ChannelViewModel @Inject constructor(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val filteredChannels: StateFlow<List<ChannelUiModel>> =
-        combine(_uiState, _selectedTab, _searchQuery, favourites, widgetChannels) {
-            state, tab, query, favs, widgets ->
+        combine(
+            _uiState, _selectedTab, _searchQuery,
+            favourites, widgetChannels, _streamSelections
+        ) { state, tab, query, favs, widgets, selections ->
             val favIds    = favs.map { it.id }.toSet()
             val widgetIds = widgets.map { it.id }.toSet()
             val all = (state as? UiState.Success)?.data ?: return@combine emptyList()
             all.map { ch ->
-                ch.copy(isFavourite = ch.id in favIds, isWidget = ch.id in widgetIds)
+                ch.copy(
+                    isFavourite         = ch.id in favIds,
+                    isWidget            = ch.id in widgetIds,
+                    selectedStreamIndex = selections[ch.id] ?: 0
+                )
             }.filter { ch ->
                 val matchesTab = when (tab) {
                     ChannelTab.ALL     -> true
@@ -67,8 +79,13 @@ class ChannelViewModel @Inject constructor(
         }
     }
 
-    fun selectTab(tab: ChannelTab) { _selectedTab.value = tab }
-    fun setSearchQuery(q: String)  { _searchQuery.value = q }
+    fun selectTab(tab: ChannelTab)   { _selectedTab.value = tab }
+    fun setSearchQuery(q: String)    { _searchQuery.value = q }
+
+    /** User picked a specific feed/stream index for a channel. */
+    fun selectStream(channelId: String, index: Int) {
+        _streamSelections.value = _streamSelections.value + (channelId to index)
+    }
 
     fun toggleFavourite(model: ChannelUiModel) {
         viewModelScope.launch { repo.toggleFavourite(model) }

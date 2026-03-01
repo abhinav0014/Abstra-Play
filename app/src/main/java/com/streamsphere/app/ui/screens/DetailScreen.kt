@@ -47,6 +47,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.streamsphere.app.data.model.ChannelUiModel
+import com.streamsphere.app.data.model.StreamOption
 import com.streamsphere.app.ui.components.*
 import com.streamsphere.app.ui.theme.*
 import com.streamsphere.app.viewmodel.ChannelViewModel
@@ -69,7 +70,6 @@ fun DetailScreen(
     val channels by viewModel.filteredChannels.collectAsState()
     val channel  = remember(channels, channelId) { channels.find { it.id == channelId } }
 
-    // Start fullscreen immediately if launched from widget
     var isFullscreen by remember { mutableStateOf(startInFullscreen) }
 
     if (isFullscreen) {
@@ -78,7 +78,8 @@ fun DetailScreen(
                 channel          = ch,
                 onExitFullscreen = { isFullscreen = false },
                 onFavourite      = { viewModel.toggleFavourite(ch) },
-                onWidget         = { viewModel.toggleWidget(ch) }
+                onWidget         = { viewModel.toggleWidget(ch) },
+                onSelectStream   = { idx -> viewModel.selectStream(ch.id, idx) }
             )
         }
     } else {
@@ -117,6 +118,7 @@ fun DetailScreen(
                     autoPlay          = autoPlay,
                     onWidget          = { viewModel.toggleWidget(channel) },
                     onEnterFullscreen = { isFullscreen = true },
+                    onSelectStream    = { idx -> viewModel.selectStream(channel.id, idx) },
                     modifier          = Modifier.padding(padding)
                 )
             }
@@ -135,17 +137,19 @@ private fun DetailContent(
     autoPlay: Boolean,
     onWidget: () -> Unit,
     onEnterFullscreen: () -> Unit,
+    onSelectStream: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context   = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val catColor  = categoryColorFor(channel)
-    val hasStream = channel.streamUrl != null
 
-    var isPlaying   by remember { mutableStateOf(autoPlay && hasStream) }
+    var isPlaying   by remember { mutableStateOf(autoPlay) }
     var playerError by remember { mutableStateOf<String?>(null) }
 
-    val exoPlayer = rememberExoPlayer(context, channel.streamUrl, autoPlay) { err ->
+    // Rebuild player whenever the selected stream URL changes
+    val currentUrl = channel.streamUrl
+    val exoPlayer = rememberExoPlayer(context, currentUrl, autoPlay) { err ->
         playerError = err; isPlaying = false
     }
 
@@ -167,11 +171,14 @@ private fun DetailContent(
         onDispose { lifecycle.removeObserver(obs); exoPlayer?.release() }
     }
 
+    // Feed picker sheet state
+    var showFeedPicker by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
-        // 16:9 player area
+        // ── 16:9 player area ─────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -179,7 +186,7 @@ private fun DetailContent(
                 .background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
-            if (hasStream && exoPlayer != null) {
+            if (exoPlayer != null) {
                 AndroidView(
                     factory = { ctx ->
                         PlayerView(ctx).apply {
@@ -202,9 +209,7 @@ private fun DetailContent(
                     }
                 }
 
-                // Inline overlay controls
                 Box(Modifier.fillMaxSize()) {
-                    // Fullscreen button - top right
                     IconButton(
                         onClick  = onEnterFullscreen,
                         modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
@@ -212,7 +217,6 @@ private fun DetailContent(
                         Icon(Icons.Filled.Fullscreen, "Fullscreen", tint = Color.White,
                             modifier = Modifier.size(28.dp))
                     }
-                    // Play/Pause center
                     FilledIconButton(
                         onClick  = { if (isPlaying) exoPlayer.pause() else exoPlayer.play() },
                         modifier = Modifier.align(Alignment.Center).size(52.dp),
@@ -225,19 +229,36 @@ private fun DetailContent(
                     }
                 }
 
-                playerError?.let { err -> ErrorOverlay(err) { playerError = null; exoPlayer.prepare(); exoPlayer.play() } }
+                playerError?.let { err ->
+                    ErrorOverlay(err) { playerError = null; exoPlayer.prepare(); exoPlayer.play() }
+                }
             } else {
-                NoStreamOverlay(channel, catColor)
+                // No stream at all (shouldn't happen after filtering)
+                Box(Modifier.fillMaxSize().background(catColor.copy(0.08f)), contentAlignment = Alignment.Center) {
+                    Text("No stream available", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
 
-        // Channel info
-        Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // ── Feed / Language selector bar ──────────────────────────────────────
+        if (channel.hasMultipleFeeds) {
+            FeedSelectorBar(
+                channel        = channel,
+                onOpenPicker   = { showFeedPicker = true },
+                catColor       = catColor
+            )
+        }
+
+        // ── Channel info ──────────────────────────────────────────────────────
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             Text(channel.name, style = MaterialTheme.typography.headlineMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(channel.countryFlag, style = MaterialTheme.typography.titleLarge)
                 Text(channel.country, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (channel.streamUrl != null) LiveBadge()
+                LiveBadge()
             }
             if (channel.categories.isNotEmpty()) {
                 Text("Categories", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -255,7 +276,208 @@ private fun DetailContent(
                 Spacer(Modifier.width(8.dp))
                 Text(if (channel.isWidget) "Remove from Widget" else "Add to Home Screen Widget")
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+
+    // ── Feed picker bottom sheet ──────────────────────────────────────────────
+    if (showFeedPicker) {
+        FeedPickerSheet(
+            channel        = channel,
+            catColor       = catColor,
+            onSelect       = { idx ->
+                onSelectStream(idx)
+                showFeedPicker = false
+            },
+            onDismiss      = { showFeedPicker = false }
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Feed selector bar (shown below the player when multiple feeds exist)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun FeedSelectorBar(
+    channel: ChannelUiModel,
+    onOpenPicker: () -> Unit,
+    catColor: Color
+) {
+    val current = channel.currentStream
+    Surface(
+        color  = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(Icons.Filled.Subtitles, null, tint = catColor, modifier = Modifier.size(18.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text  = current?.feedName ?: "Default",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (!current?.languageNames.isNullOrEmpty()) {
+                    Text(
+                        text  = current!!.languageNames.joinToString(" · "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            current?.quality?.let {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = catColor.copy(0.15f)
+                ) {
+                    Text(
+                        text     = it,
+                        style    = MaterialTheme.typography.labelSmall,
+                        color    = catColor,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            TextButton(onClick = onOpenPicker, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                Text("Change", style = MaterialTheme.typography.labelMedium, color = catColor)
+                Icon(Icons.Filled.ExpandMore, null, modifier = Modifier.size(16.dp), tint = catColor)
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Feed / Language picker bottom sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FeedPickerSheet(
+    channel: ChannelUiModel,
+    catColor: Color,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor   = MaterialTheme.colorScheme.surface,
+        shape            = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+    ) {
+        Column(modifier = Modifier.padding(bottom = 32.dp)) {
+            // Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.Language, null, tint = catColor, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Choose Feed / Language",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            Text(
+                "${channel.streamOptions.size} feeds available",
+                style    = MaterialTheme.typography.bodySmall,
+                color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
+            )
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider()
+
+            channel.streamOptions.forEachIndexed { idx, option ->
+                val isSelected = idx == channel.selectedStreamIndex
+                FeedOptionRow(
+                    option     = option,
+                    isSelected = isSelected,
+                    catColor   = catColor,
+                    onClick    = { onSelect(idx) }
+                )
+                if (idx < channel.streamOptions.lastIndex) HorizontalDivider(modifier = Modifier.padding(start = 64.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeedOptionRow(
+    option: StreamOption,
+    isSelected: Boolean,
+    catColor: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        color   = if (isSelected) catColor.copy(0.08f) else Color.Transparent,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Selection indicator
+            Box(
+                modifier = Modifier.size(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSelected) {
+                    Icon(Icons.Filled.CheckCircle, null, tint = catColor, modifier = Modifier.size(22.dp))
+                } else {
+                    Icon(Icons.Outlined.RadioButtonUnchecked, null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                }
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text  = option.feedName,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (isSelected) catColor else MaterialTheme.colorScheme.onSurface
+                    )
+                    if (option.isMain) {
+                        Surface(shape = RoundedCornerShape(4.dp), color = catColor.copy(0.15f)) {
+                            Text(
+                                text     = "MAIN",
+                                style    = MaterialTheme.typography.labelSmall,
+                                color    = catColor,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
+                if (option.languageNames.isNotEmpty()) {
+                    Text(
+                        text  = "🌐 " + option.languageNames.joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Quality badge
+            option.quality?.let { q ->
+                Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                    Text(
+                        text     = q,
+                        style    = MaterialTheme.typography.labelSmall,
+                        color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -270,43 +492,39 @@ private fun FullscreenPlayer(
     channel: ChannelUiModel,
     onExitFullscreen: () -> Unit,
     onFavourite: () -> Unit,
-    onWidget: () -> Unit
+    onWidget: () -> Unit,
+    onSelectStream: (Int) -> Unit
 ) {
     val context   = LocalContext.current
     val activity  = context as Activity
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val catColor  = categoryColorFor(channel)
 
-    // Audio manager — safe, no permissions needed
     val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     val maxVol       = remember { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).toFloat() }
 
-    var isPlaying        by remember { mutableStateOf(true) }
-    var playerError      by remember { mutableStateOf<String?>(null) }
-    var isLocked         by remember { mutableStateOf(false) }
-    var showControls     by remember { mutableStateOf(true) }
-    var isRotLocked      by remember { mutableStateOf(false) }
+    var isPlaying       by remember { mutableStateOf(true) }
+    var playerError     by remember { mutableStateOf<String?>(null) }
+    var isLocked        by remember { mutableStateOf(false) }
+    var showControls    by remember { mutableStateOf(true) }
+    var isRotLocked     by remember { mutableStateOf(false) }
+    var showFeedPicker  by remember { mutableStateOf(false) }
 
-    // Volume — clamped 0..1, uses stream volume (no permission needed)
-    var volumeLevel      by remember {
+    var volumeLevel by remember {
         mutableStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxVol)
     }
-
-    // Brightness — uses ONLY WindowManager.LayoutParams (no WRITE_SETTINGS permission needed, no crash)
-    var brightnessLevel  by remember {
+    var brightnessLevel by remember {
         val cur = activity.window.attributes.screenBrightness
-        mutableStateOf(if (cur < 0) 0.5f else cur)   // -1 means "system default" → use 0.5 as display value
+        mutableStateOf(if (cur < 0) 0.5f else cur)
     }
 
-    // Helper: apply brightness safely via WindowManager only
     fun applyBrightness(value: Float) {
-        val clamped = value.coerceIn(0.01f, 1.0f)  // never go to 0 (screen fully off = crash risk)
+        val clamped = value.coerceIn(0.01f, 1.0f)
         val lp = activity.window.attributes
         lp.screenBrightness = clamped
         activity.window.attributes = lp
     }
 
-    // Helper: apply volume safely
     fun applyVolume(value: Float) {
         val clamped = value.coerceIn(0f, 1f)
         audioManager.setStreamVolume(
@@ -316,8 +534,21 @@ private fun FullscreenPlayer(
         )
     }
 
-    // Force landscape + hide system bars
     LaunchedEffect(Unit) {
+        // Ensure audio is not muted when entering fullscreen
+        if (audioManager.isStreamMute(AudioManager.STREAM_MUSIC)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
+            }
+        }
+        // If volume is 0, set it to 30% so there's always sound
+        val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        if (currentVol == 0) {
+            val thirtyPct = (maxVol * 0.3f).roundToInt().coerceAtLeast(1)
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, thirtyPct, 0)
+            volumeLevel = thirtyPct / maxVol
+        }
+
         activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             activity.window.insetsController?.apply {
@@ -334,15 +565,12 @@ private fun FullscreenPlayer(
         }
     }
 
-    // Restore on exit
     DisposableEffect(Unit) {
         onDispose {
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            // Restore system brightness to "follow system"
             val lp = activity.window.attributes
             lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
             activity.window.attributes = lp
-            // Restore bars
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 activity.window.insetsController?.show(
                     android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars()
@@ -354,7 +582,6 @@ private fun FullscreenPlayer(
         }
     }
 
-    // Auto-hide controls after 4s
     LaunchedEffect(showControls, isLocked) {
         if (showControls && !isLocked) {
             delay(4000)
@@ -366,6 +593,8 @@ private fun FullscreenPlayer(
         playerError = err; isPlaying = false
     }
     LaunchedEffect(exoPlayer) {
+        // Ensure player audio is not muted
+        exoPlayer?.volume = 1f
         exoPlayer?.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
         })
@@ -386,26 +615,26 @@ private fun FullscreenPlayer(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            // Vertical drag gesture: left half = brightness, right half = volume
             .pointerInput(isLocked) {
                 if (!isLocked) {
                     detectVerticalDragGestures { change, dragAmount ->
-                        val delta     = -dragAmount / size.height.toFloat()
-                        val isLeft    = change.position.x < size.width / 2f
+                        val delta  = -dragAmount / size.height.toFloat()
+                        val isLeft = change.position.x < size.width / 2f
                         if (isLeft) {
                             val newBright = (brightnessLevel + delta).coerceIn(0.01f, 1.0f)
                             brightnessLevel = newBright
                             applyBrightness(newBright)
                         } else {
                             val newVol = (volumeLevel + delta).coerceIn(0f, 1f)
-                            volumeLevel = newVol
-                            applyVolume(newVol)
+                            // Never allow dragging to true 0 — keep at least 5%
+                            val safeVol = newVol.coerceAtLeast(0.05f)
+                            volumeLevel = safeVol
+                            applyVolume(safeVol)
                         }
                         showControls = true
                     }
                 }
             }
-            // Tap anywhere to toggle controls
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
@@ -415,7 +644,6 @@ private fun FullscreenPlayer(
                 }
             }
     ) {
-        // Video surface
         if (exoPlayer != null) {
             AndroidView(
                 factory = { ctx ->
@@ -433,11 +661,9 @@ private fun FullscreenPlayer(
             )
         }
 
-        // Always-visible edge indicators for volume (right) and brightness (left)
         EdgeLevelBars(brightnessLevel = brightnessLevel, volumeLevel = volumeLevel)
 
         if (isLocked) {
-            // Locked: only show unlock icon on tap
             AnimatedVisibility(visible = showControls, enter = fadeIn(), exit = fadeOut()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Surface(shape = RoundedCornerShape(50), color = Color.Black.copy(0.55f)) {
@@ -451,7 +677,6 @@ private fun FullscreenPlayer(
                 }
             }
         } else {
-            // Full controls overlay
             AnimatedVisibility(visible = showControls, enter = fadeIn(), exit = fadeOut()) {
                 FullscreenControls(
                     channel          = channel,
@@ -468,19 +693,31 @@ private fun FullscreenPlayer(
                         activity.requestedOrientation =
                             if (isRotLocked) ActivityInfo.SCREEN_ORIENTATION_LOCKED
                             else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                    }
+                    },
+                    onOpenFeedPicker = if (channel.hasMultipleFeeds) {{ showFeedPicker = true }} else null
                 )
             }
-
             playerError?.let { err ->
                 ErrorOverlay(err) { playerError = null; exoPlayer?.prepare(); exoPlayer?.play() }
             }
         }
     }
+
+    if (showFeedPicker) {
+        FeedPickerSheet(
+            channel   = channel,
+            catColor  = catColor,
+            onSelect  = { idx ->
+                onSelectStream(idx)
+                showFeedPicker = false
+            },
+            onDismiss = { showFeedPicker = false }
+        )
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Fullscreen controls
+// Fullscreen controls (updated with feed picker button)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -494,7 +731,8 @@ private fun FullscreenControls(
     onForward: () -> Unit,
     onExitFullscreen: () -> Unit,
     onLock: () -> Unit,
-    onToggleRot: () -> Unit
+    onToggleRot: () -> Unit,
+    onOpenFeedPicker: (() -> Unit)?
 ) {
     Box(
         modifier = Modifier
@@ -513,14 +751,32 @@ private fun FullscreenControls(
                 Icon(Icons.Filled.FullscreenExit, "Exit fullscreen", tint = Color.White)
             }
             Spacer(Modifier.width(6.dp))
-            Text(
-                text  = channel.name,
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-                modifier = Modifier.weight(1f)
-            )
-            if (channel.streamUrl != null) LiveBadge()
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text  = channel.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White
+                )
+                // Show current feed name if multiple feeds
+                channel.currentStream?.let { stream ->
+                    if (channel.hasMultipleFeeds) {
+                        Text(
+                            text  = stream.feedName + if (stream.languageNames.isNotEmpty()) " · ${stream.languageNames.first()}" else "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(0.7f)
+                        )
+                    }
+                }
+            }
+            LiveBadge()
             Spacer(Modifier.width(8.dp))
+
+            // Feed/Language picker button
+            if (onOpenFeedPicker != null) {
+                IconButton(onClick = onOpenFeedPicker) {
+                    Icon(Icons.Filled.Language, "Change Feed", tint = catColor)
+                }
+            }
             // Rotation lock
             IconButton(onClick = onToggleRot) {
                 Icon(
@@ -550,9 +806,9 @@ private fun FullscreenControls(
                 colors   = IconButtonDefaults.filledIconButtonColors(containerColor = catColor)
             ) {
                 Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    imageVector        = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = null,
-                    modifier = Modifier.size(40.dp)
+                    modifier           = Modifier.size(40.dp)
                 )
             }
             IconButton(onClick = onForward, modifier = Modifier.size(48.dp)) {
@@ -560,66 +816,33 @@ private fun FullscreenControls(
             }
         }
 
-        // Bottom hint text
         Text(
-            text     = "← Swipe left edge: brightness  |  Swipe right edge: volume →",
+            text     = "← Brightness  |  Volume →",
             style    = MaterialTheme.typography.labelSmall,
-            color    = Color.White.copy(0.55f),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 14.dp)
+            color    = Color.White.copy(0.45f),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp)
         )
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Edge level bars (brightness left, volume right) — always visible
+// Edge level bars
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun EdgeLevelBars(brightnessLevel: Float, volumeLevel: Float) {
     Box(Modifier.fillMaxSize()) {
-        // Left — brightness (amber)
         Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(5.dp)
-                .align(Alignment.CenterStart)
-                .padding(vertical = 60.dp)
+            modifier = Modifier.fillMaxHeight().width(5.dp).align(Alignment.CenterStart).padding(vertical = 60.dp)
         ) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.White.copy(0.12f), RoundedCornerShape(3.dp))
-            )
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(brightnessLevel.coerceIn(0.01f, 1f))
-                    .align(Alignment.BottomStart)
-                    .background(Color(0xFFFBD38D).copy(0.85f), RoundedCornerShape(3.dp))
-            )
+            Box(Modifier.fillMaxSize().background(Color.White.copy(0.12f), RoundedCornerShape(3.dp)))
+            Box(Modifier.fillMaxWidth().fillMaxHeight(brightnessLevel.coerceIn(0.01f, 1f)).align(Alignment.BottomStart).background(Color(0xFFFBD38D).copy(0.85f), RoundedCornerShape(3.dp)))
         }
-        // Right — volume (blue)
         Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(5.dp)
-                .align(Alignment.CenterEnd)
-                .padding(vertical = 60.dp)
+            modifier = Modifier.fillMaxHeight().width(5.dp).align(Alignment.CenterEnd).padding(vertical = 60.dp)
         ) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.White.copy(0.12f), RoundedCornerShape(3.dp))
-            )
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(volumeLevel.coerceIn(0.01f, 1f))
-                    .align(Alignment.BottomStart)
-                    .background(Color(0xFF4F8EF7).copy(0.85f), RoundedCornerShape(3.dp))
-            )
+            Box(Modifier.fillMaxSize().background(Color.White.copy(0.12f), RoundedCornerShape(3.dp)))
+            Box(Modifier.fillMaxWidth().fillMaxHeight(volumeLevel.coerceIn(0.05f, 1f)).align(Alignment.BottomStart).background(Color(0xFF4F8EF7).copy(0.85f), RoundedCornerShape(3.dp)))
         }
     }
 }
@@ -657,23 +880,8 @@ private fun ErrorOverlay(message: String, onRetry: () -> Unit) {
     }
 }
 
-@Composable
-private fun NoStreamOverlay(channel: ChannelUiModel, catColor: Color) {
-    Box(Modifier.fillMaxSize().background(catColor.copy(0.08f)), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (channel.logoUrl != null) {
-                AsyncImage(model = channel.logoUrl, contentDescription = channel.name, contentScale = ContentScale.Fit, modifier = Modifier.size(100.dp))
-            } else {
-                Text(channel.countryFlag, style = MaterialTheme.typography.displayLarge)
-            }
-            Spacer(Modifier.height(8.dp))
-            Text("No stream available", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers
+// ExoPlayer factory — always with audio enabled, rebuilds on URL change
 // ─────────────────────────────────────────────────────────────────────────────
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -686,6 +894,8 @@ private fun rememberExoPlayer(
 ): ExoPlayer? = remember(streamUrl) {
     if (streamUrl == null) return@remember null
     ExoPlayer.Builder(context).build().apply {
+        // Guarantee audio is never muted at the player level
+        volume = 1f
         val src = HlsMediaSource.Factory(DefaultHttpDataSource.Factory())
             .createMediaSource(MediaItem.fromUri(Uri.parse(streamUrl)))
         setMediaSource(src)
