@@ -36,9 +36,12 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
+import androidx.media3.common.TrackGroup
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -52,7 +55,22 @@ import com.streamsphere.app.ui.components.*
 import com.streamsphere.app.ui.theme.*
 import com.streamsphere.app.viewmodel.ChannelViewModel
 import kotlinx.coroutines.delay
+import java.util.Locale
 import kotlin.math.roundToInt
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Audio track data class
+// ─────────────────────────────────────────────────────────────────────────────
+
+data class AudioTrack(
+    val groupIndex: Int,
+    val trackIndex: Int,
+    val language: String?,        // BCP-47 / ISO 639 tag from the stream
+    val label: String,            // human-readable display name
+    val channelCount: Int,
+    val sampleRate: Int,
+    val isSelected: Boolean
+)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Entry point
@@ -144,18 +162,27 @@ private fun DetailContent(
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val catColor  = categoryColorFor(channel)
 
-    var isPlaying   by remember { mutableStateOf(autoPlay) }
-    var playerError by remember { mutableStateOf<String?>(null) }
+    var isPlaying    by remember { mutableStateOf(autoPlay) }
+    var playerError  by remember { mutableStateOf<String?>(null) }
+    var audioTracks  by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
 
-    // Rebuild player whenever the selected stream URL changes
-    val currentUrl = channel.streamUrl
-    val exoPlayer = rememberExoPlayer(context, currentUrl, autoPlay) { err ->
+    val exoPlayer = rememberExoPlayer(context, channel.streamUrl, autoPlay) { err ->
         playerError = err; isPlaying = false
     }
 
+    // Listen for track changes to populate audio track list
     LaunchedEffect(exoPlayer) {
-        exoPlayer?.addListener(object : Player.Listener {
+        exoPlayer ?: return@LaunchedEffect
+        exoPlayer.volume = 1f
+        exoPlayer.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
+            override fun onTracksChanged(tracks: Tracks) {
+                audioTracks = extractAudioTracks(tracks)
+                // If somehow no track is selected, force the first one
+                if (audioTracks.isNotEmpty() && audioTracks.none { it.isSelected }) {
+                    selectAudioTrack(exoPlayer, audioTracks.first())
+                }
+            }
         })
     }
 
@@ -171,14 +198,13 @@ private fun DetailContent(
         onDispose { lifecycle.removeObserver(obs); exoPlayer?.release() }
     }
 
-    // Feed picker sheet state
-    var showFeedPicker by remember { mutableStateOf(false) }
+    var showFeedPicker  by remember { mutableStateOf(false) }
+    var showAudioPicker by remember { mutableStateOf(false) }
 
     Column(
-        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(0.dp)
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())
     ) {
-        // ── 16:9 player area ─────────────────────────────────────────────────
+        // ── 16:9 player ──────────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -201,14 +227,12 @@ private fun DetailContent(
                     },
                     modifier = Modifier.fillMaxSize()
                 )
-
                 if (!isPlaying && playerError == null) {
                     ThumbnailOverlay(channel, catColor) {
                         playerError = null
                         exoPlayer.playWhenReady = true
                     }
                 }
-
                 Box(Modifier.fillMaxSize()) {
                     IconButton(
                         onClick  = onEnterFullscreen,
@@ -222,30 +246,25 @@ private fun DetailContent(
                         modifier = Modifier.align(Alignment.Center).size(52.dp),
                         colors   = IconButtonDefaults.filledIconButtonColors(containerColor = catColor.copy(0.85f))
                     ) {
-                        Icon(
-                            if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            null, modifier = Modifier.size(32.dp)
-                        )
+                        Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            null, modifier = Modifier.size(32.dp))
                     }
                 }
-
                 playerError?.let { err ->
                     ErrorOverlay(err) { playerError = null; exoPlayer.prepare(); exoPlayer.play() }
-                }
-            } else {
-                // No stream at all (shouldn't happen after filtering)
-                Box(Modifier.fillMaxSize().background(catColor.copy(0.08f)), contentAlignment = Alignment.Center) {
-                    Text("No stream available", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
 
-        // ── Feed / Language selector bar ──────────────────────────────────────
+        // ── Selector bars ────────────────────────────────────────────────────
         if (channel.hasMultipleFeeds) {
-            FeedSelectorBar(
-                channel        = channel,
-                onOpenPicker   = { showFeedPicker = true },
-                catColor       = catColor
+            FeedSelectorBar(channel = channel, catColor = catColor, onOpenPicker = { showFeedPicker = true })
+        }
+        if (audioTracks.size > 1) {
+            AudioSelectorBar(
+                audioTracks  = audioTracks,
+                catColor     = catColor,
+                onOpenPicker = { showAudioPicker = true }
             )
         }
 
@@ -257,11 +276,13 @@ private fun DetailContent(
             Text(channel.name, style = MaterialTheme.typography.headlineMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(channel.countryFlag, style = MaterialTheme.typography.titleLarge)
-                Text(channel.country, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(channel.country, style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 LiveBadge()
             }
             if (channel.categories.isNotEmpty()) {
-                Text("Categories", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Categories", style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     channel.categories.forEach { cat -> CategoryChip(cat, catColor) }
                 }
@@ -270,7 +291,8 @@ private fun DetailContent(
                 onClick  = onWidget,
                 modifier = Modifier.fillMaxWidth(),
                 border   = BorderStroke(1.dp, if (channel.isWidget) catColor else MaterialTheme.colorScheme.outline.copy(0.5f)),
-                colors   = ButtonDefaults.outlinedButtonColors(contentColor = if (channel.isWidget) catColor else MaterialTheme.colorScheme.onSurfaceVariant)
+                colors   = ButtonDefaults.outlinedButtonColors(
+                    contentColor = if (channel.isWidget) catColor else MaterialTheme.colorScheme.onSurfaceVariant)
             ) {
                 Icon(if (channel.isWidget) Icons.Filled.Widgets else Icons.Outlined.Widgets, null)
                 Spacer(Modifier.width(8.dp))
@@ -280,33 +302,39 @@ private fun DetailContent(
         }
     }
 
-    // ── Feed picker bottom sheet ──────────────────────────────────────────────
     if (showFeedPicker) {
-        FeedPickerSheet(
-            channel        = channel,
-            catColor       = catColor,
-            onSelect       = { idx ->
-                onSelectStream(idx)
-                showFeedPicker = false
+        FeedPickerSheet(channel = channel, catColor = catColor,
+            onSelect  = { idx -> onSelectStream(idx); showFeedPicker = false },
+            onDismiss = { showFeedPicker = false })
+    }
+    if (showAudioPicker && exoPlayer != null) {
+        AudioPickerSheet(
+            audioTracks = audioTracks,
+            catColor    = catColor,
+            onSelect    = { track ->
+                selectAudioTrack(exoPlayer, track)
+                // Refresh list to show new selection
+                audioTracks = audioTracks.map { it.copy(isSelected = it.groupIndex == track.groupIndex && it.trackIndex == track.trackIndex) }
+                showAudioPicker = false
             },
-            onDismiss      = { showFeedPicker = false }
+            onDismiss   = { showAudioPicker = false }
         )
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Feed selector bar (shown below the player when multiple feeds exist)
+// Audio selector bar
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun FeedSelectorBar(
-    channel: ChannelUiModel,
-    onOpenPicker: () -> Unit,
-    catColor: Color
+private fun AudioSelectorBar(
+    audioTracks: List<AudioTrack>,
+    catColor: Color,
+    onOpenPicker: () -> Unit
 ) {
-    val current = channel.currentStream
+    val selected = audioTracks.firstOrNull { it.isSelected } ?: audioTracks.first()
     Surface(
-        color  = MaterialTheme.colorScheme.surfaceVariant,
+        color    = MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -316,32 +344,178 @@ private fun FeedSelectorBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(Icons.Filled.Subtitles, null, tint = catColor, modifier = Modifier.size(18.dp))
+            Icon(Icons.Filled.RecordVoiceOver, null, tint = catColor, modifier = Modifier.size(18.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text  = current?.feedName ?: "Default",
+                    text  = selected.label,
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                if (!current?.languageNames.isNullOrEmpty()) {
+                val detail = buildString {
+                    if (selected.channelCount > 0) append(if (selected.channelCount >= 6) "5.1" else if (selected.channelCount == 2) "Stereo" else "Mono")
+                    if (selected.sampleRate > 0) append(" · ${selected.sampleRate / 1000}kHz")
+                }
+                if (detail.isNotBlank()) {
+                    Text(detail, style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Surface(shape = RoundedCornerShape(4.dp), color = catColor.copy(0.12f)) {
+                Text(
+                    text     = "${audioTracks.size} audio",
+                    style    = MaterialTheme.typography.labelSmall,
+                    color    = catColor,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+            TextButton(onClick = onOpenPicker, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                Text("Change", style = MaterialTheme.typography.labelMedium, color = catColor)
+                Icon(Icons.Filled.ExpandMore, null, modifier = Modifier.size(16.dp), tint = catColor)
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Audio picker bottom sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AudioPickerSheet(
+    audioTracks: List<AudioTrack>,
+    catColor: Color,
+    onSelect: (AudioTrack) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor   = MaterialTheme.colorScheme.surface,
+        shape            = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+    ) {
+        Column(modifier = Modifier.padding(bottom = 32.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.RecordVoiceOver, null, tint = catColor, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Audio Track / Language", style = MaterialTheme.typography.titleMedium)
+            }
+            Text(
+                "${audioTracks.size} tracks available",
+                style    = MaterialTheme.typography.bodySmall,
+                color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
+            )
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider()
+
+            audioTracks.forEachIndexed { idx, track ->
+                AudioTrackRow(track = track, catColor = catColor, onClick = { onSelect(track) })
+                if (idx < audioTracks.lastIndex) {
+                    HorizontalDivider(modifier = Modifier.padding(start = 64.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AudioTrackRow(
+    track: AudioTrack,
+    catColor: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick  = onClick,
+        color    = if (track.isSelected) catColor.copy(0.08f) else Color.Transparent,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Selection indicator
+            Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                if (track.isSelected) {
+                    Icon(Icons.Filled.CheckCircle, null, tint = catColor, modifier = Modifier.size(22.dp))
+                } else {
+                    Icon(Icons.Outlined.RadioButtonUnchecked, null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                }
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text  = track.label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (track.isSelected) catColor else MaterialTheme.colorScheme.onSurface
+                )
+                val detail = buildList {
+                    if (track.channelCount >= 6) add("5.1 Surround")
+                    else if (track.channelCount == 2) add("Stereo")
+                    else if (track.channelCount == 1) add("Mono")
+                    if (track.sampleRate > 0) add("${track.sampleRate / 1000} kHz")
+                }.joinToString(" · ")
+                if (detail.isNotBlank()) {
+                    Text(detail, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            // Language code badge
+            track.language?.let { lang ->
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
                     Text(
-                        text  = current!!.languageNames.joinToString(" · "),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text     = lang.uppercase(),
+                        style    = MaterialTheme.typography.labelSmall,
+                        color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
             }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Feed selector bar (unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun FeedSelectorBar(
+    channel: ChannelUiModel,
+    onOpenPicker: () -> Unit,
+    catColor: Color
+) {
+    val current = channel.currentStream
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(Icons.Filled.Subtitles, null, tint = catColor, modifier = Modifier.size(18.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(current?.feedName ?: "Default", style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface)
+                if (!current?.languageNames.isNullOrEmpty()) {
+                    Text(current!!.languageNames.joinToString(" · "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             current?.quality?.let {
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = catColor.copy(0.15f)
-                ) {
-                    Text(
-                        text     = it,
-                        style    = MaterialTheme.typography.labelSmall,
-                        color    = catColor,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+                Surface(shape = RoundedCornerShape(4.dp), color = catColor.copy(0.15f)) {
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = catColor,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                 }
             }
             TextButton(onClick = onOpenPicker, contentPadding = PaddingValues(horizontal = 8.dp)) {
@@ -353,7 +527,7 @@ private fun FeedSelectorBar(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Feed / Language picker bottom sheet
+// Feed picker sheet (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -370,120 +544,70 @@ private fun FeedPickerSheet(
         shape            = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
         Column(modifier = Modifier.padding(bottom = 32.dp)) {
-            // Header
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(Icons.Filled.Language, null, tint = catColor, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    "Choose Feed / Language",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Text("Choose Feed / Quality", style = MaterialTheme.typography.titleMedium)
             }
-            Text(
-                "${channel.streamOptions.size} feeds available",
+            Text("${channel.streamOptions.size} feeds available",
                 style    = MaterialTheme.typography.bodySmall,
                 color    = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
-            )
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp))
             Spacer(Modifier.height(8.dp))
             HorizontalDivider()
-
             channel.streamOptions.forEachIndexed { idx, option ->
                 val isSelected = idx == channel.selectedStreamIndex
-                FeedOptionRow(
-                    option     = option,
-                    isSelected = isSelected,
-                    catColor   = catColor,
-                    onClick    = { onSelect(idx) }
-                )
+                Surface(
+                    onClick  = { onSelect(idx) },
+                    color    = if (isSelected) catColor.copy(0.08f) else Color.Transparent,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                            if (isSelected) Icon(Icons.Filled.CheckCircle, null, tint = catColor, modifier = Modifier.size(22.dp))
+                            else Icon(Icons.Outlined.RadioButtonUnchecked, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(option.feedName, style = MaterialTheme.typography.bodyLarge,
+                                    color = if (isSelected) catColor else MaterialTheme.colorScheme.onSurface)
+                                if (option.isMain) {
+                                    Surface(shape = RoundedCornerShape(4.dp), color = catColor.copy(0.15f)) {
+                                        Text("MAIN", style = MaterialTheme.typography.labelSmall, color = catColor,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
+                                    }
+                                }
+                            }
+                            if (option.languageNames.isNotEmpty()) {
+                                Text("🌐 " + option.languageNames.joinToString(" · "),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        option.quality?.let { q ->
+                            Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                                Text(q, style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                            }
+                        }
+                    }
+                }
                 if (idx < channel.streamOptions.lastIndex) HorizontalDivider(modifier = Modifier.padding(start = 64.dp))
             }
         }
     }
 }
 
-@Composable
-private fun FeedOptionRow(
-    option: StreamOption,
-    isSelected: Boolean,
-    catColor: Color,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        color   = if (isSelected) catColor.copy(0.08f) else Color.Transparent,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Selection indicator
-            Box(
-                modifier = Modifier.size(24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isSelected) {
-                    Icon(Icons.Filled.CheckCircle, null, tint = catColor, modifier = Modifier.size(22.dp))
-                } else {
-                    Icon(Icons.Outlined.RadioButtonUnchecked, null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                }
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text  = option.feedName,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (isSelected) catColor else MaterialTheme.colorScheme.onSurface
-                    )
-                    if (option.isMain) {
-                        Surface(shape = RoundedCornerShape(4.dp), color = catColor.copy(0.15f)) {
-                            Text(
-                                text     = "MAIN",
-                                style    = MaterialTheme.typography.labelSmall,
-                                color    = catColor,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
-                }
-                if (option.languageNames.isNotEmpty()) {
-                    Text(
-                        text  = "🌐 " + option.languageNames.joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            // Quality badge
-            option.quality?.let { q ->
-                Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-                    Text(
-                        text     = q,
-                        style    = MaterialTheme.typography.labelSmall,
-                        color    = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// TRUE fullscreen landscape player
+// Fullscreen player
 // ─────────────────────────────────────────────────────────────────────────────
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -509,6 +633,8 @@ private fun FullscreenPlayer(
     var showControls    by remember { mutableStateOf(true) }
     var isRotLocked     by remember { mutableStateOf(false) }
     var showFeedPicker  by remember { mutableStateOf(false) }
+    var showAudioPicker by remember { mutableStateOf(false) }
+    var audioTracks     by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
 
     var volumeLevel by remember {
         mutableStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxVol)
@@ -519,36 +645,26 @@ private fun FullscreenPlayer(
     }
 
     fun applyBrightness(value: Float) {
-        val clamped = value.coerceIn(0.01f, 1.0f)
         val lp = activity.window.attributes
-        lp.screenBrightness = clamped
+        lp.screenBrightness = value.coerceIn(0.01f, 1.0f)
         activity.window.attributes = lp
     }
-
     fun applyVolume(value: Float) {
-        val clamped = value.coerceIn(0f, 1f)
-        audioManager.setStreamVolume(
-            AudioManager.STREAM_MUSIC,
-            (clamped * maxVol).roundToInt().coerceIn(0, maxVol.roundToInt()),
-            0
-        )
+        val safe = value.coerceAtLeast(0.05f)
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC,
+            (safe * maxVol).roundToInt().coerceIn(0, maxVol.roundToInt()), 0)
     }
 
     LaunchedEffect(Unit) {
-        // Ensure audio is not muted when entering fullscreen
-        if (audioManager.isStreamMute(AudioManager.STREAM_MUSIC)) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            audioManager.isStreamMute(AudioManager.STREAM_MUSIC)) {
+            audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
         }
-        // If volume is 0, set it to 30% so there's always sound
-        val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        if (currentVol == 0) {
-            val thirtyPct = (maxVol * 0.3f).roundToInt().coerceAtLeast(1)
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, thirtyPct, 0)
-            volumeLevel = thirtyPct / maxVol
+        if (audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) == 0) {
+            val v = (maxVol * 0.3f).roundToInt().coerceAtLeast(1)
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, v, 0)
+            volumeLevel = v / maxVol
         }
-
         activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             activity.window.insetsController?.apply {
@@ -557,11 +673,8 @@ private fun FullscreenPlayer(
             }
         } else {
             @Suppress("DEPRECATION")
-            activity.window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            )
+            activity.window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
         }
     }
 
@@ -573,8 +686,7 @@ private fun FullscreenPlayer(
             activity.window.attributes = lp
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 activity.window.insetsController?.show(
-                    android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars()
-                )
+                    android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
             } else {
                 @Suppress("DEPRECATION")
                 activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
@@ -583,20 +695,22 @@ private fun FullscreenPlayer(
     }
 
     LaunchedEffect(showControls, isLocked) {
-        if (showControls && !isLocked) {
-            delay(4000)
-            showControls = false
-        }
+        if (showControls && !isLocked) { delay(4000); showControls = false }
     }
 
     val exoPlayer = rememberExoPlayer(context, channel.streamUrl, true) { err ->
         playerError = err; isPlaying = false
     }
     LaunchedEffect(exoPlayer) {
-        // Ensure player audio is not muted
         exoPlayer?.volume = 1f
         exoPlayer?.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
+            override fun onTracksChanged(tracks: Tracks) {
+                audioTracks = extractAudioTracks(tracks)
+                if (audioTracks.isNotEmpty() && audioTracks.none { it.isSelected }) {
+                    selectAudioTrack(exoPlayer, audioTracks.first())
+                }
+            }
         })
     }
     DisposableEffect(lifecycle) {
@@ -620,41 +734,23 @@ private fun FullscreenPlayer(
                     detectVerticalDragGestures { change, dragAmount ->
                         val delta  = -dragAmount / size.height.toFloat()
                         val isLeft = change.position.x < size.width / 2f
-                        if (isLeft) {
-                            val newBright = (brightnessLevel + delta).coerceIn(0.01f, 1.0f)
-                            brightnessLevel = newBright
-                            applyBrightness(newBright)
-                        } else {
-                            val newVol = (volumeLevel + delta).coerceIn(0f, 1f)
-                            // Never allow dragging to true 0 — keep at least 5%
-                            val safeVol = newVol.coerceAtLeast(0.05f)
-                            volumeLevel = safeVol
-                            applyVolume(safeVol)
-                        }
+                        if (isLeft) { val b = (brightnessLevel + delta).coerceIn(0.01f, 1f); brightnessLevel = b; applyBrightness(b) }
+                        else        { val v = (volumeLevel + delta).coerceAtLeast(0.05f).coerceAtMost(1f); volumeLevel = v; applyVolume(v) }
                         showControls = true
                     }
                 }
             }
             .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        awaitPointerEvent()
-                        showControls = !showControls
-                    }
-                }
+                awaitPointerEventScope { while (true) { awaitPointerEvent(); showControls = !showControls } }
             }
     ) {
         if (exoPlayer != null) {
             AndroidView(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
-                        player        = exoPlayer
-                        useController = false
-                        resizeMode    = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                        layoutParams  = FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
-                        )
+                        player = exoPlayer; useController = false
+                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                     }
                 },
                 modifier = Modifier.fillMaxSize()
@@ -667,10 +763,8 @@ private fun FullscreenPlayer(
             AnimatedVisibility(visible = showControls, enter = fadeIn(), exit = fadeOut()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Surface(shape = RoundedCornerShape(50), color = Color.Black.copy(0.55f)) {
-                        IconButton(
-                            onClick  = { isLocked = false; showControls = true },
-                            modifier = Modifier.padding(12.dp).size(48.dp)
-                        ) {
+                        IconButton(onClick = { isLocked = false; showControls = true },
+                            modifier = Modifier.padding(12.dp).size(48.dp)) {
                             Icon(Icons.Filled.Lock, "Unlock", tint = Color.White, modifier = Modifier.size(32.dp))
                         }
                     }
@@ -683,6 +777,7 @@ private fun FullscreenPlayer(
                     isPlaying        = isPlaying,
                     catColor         = catColor,
                     isRotLocked      = isRotLocked,
+                    audioTracks      = audioTracks,
                     onPlayPause      = { if (isPlaying) exoPlayer?.pause() else exoPlayer?.play() },
                     onReplay         = { exoPlayer?.seekBack() },
                     onForward        = { exoPlayer?.seekForward() },
@@ -690,11 +785,12 @@ private fun FullscreenPlayer(
                     onLock           = { isLocked = true; showControls = false },
                     onToggleRot      = {
                         isRotLocked = !isRotLocked
-                        activity.requestedOrientation =
-                            if (isRotLocked) ActivityInfo.SCREEN_ORIENTATION_LOCKED
-                            else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                        activity.requestedOrientation = if (isRotLocked)
+                            ActivityInfo.SCREEN_ORIENTATION_LOCKED
+                        else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     },
-                    onOpenFeedPicker = if (channel.hasMultipleFeeds) {{ showFeedPicker = true }} else null
+                    onOpenFeedPicker  = if (channel.hasMultipleFeeds) {{ showFeedPicker = true }} else null,
+                    onOpenAudioPicker = if (audioTracks.size > 1) {{ showAudioPicker = true }} else null
                 )
             }
             playerError?.let { err ->
@@ -704,20 +800,28 @@ private fun FullscreenPlayer(
     }
 
     if (showFeedPicker) {
-        FeedPickerSheet(
-            channel   = channel,
-            catColor  = catColor,
-            onSelect  = { idx ->
-                onSelectStream(idx)
-                showFeedPicker = false
+        FeedPickerSheet(channel = channel, catColor = catColor,
+            onSelect  = { idx -> onSelectStream(idx); showFeedPicker = false },
+            onDismiss = { showFeedPicker = false })
+    }
+    if (showAudioPicker && exoPlayer != null) {
+        AudioPickerSheet(
+            audioTracks = audioTracks,
+            catColor    = catColor,
+            onSelect    = { track ->
+                selectAudioTrack(exoPlayer, track)
+                audioTracks = audioTracks.map {
+                    it.copy(isSelected = it.groupIndex == track.groupIndex && it.trackIndex == track.trackIndex)
+                }
+                showAudioPicker = false
             },
-            onDismiss = { showFeedPicker = false }
+            onDismiss   = { showAudioPicker = false }
         )
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Fullscreen controls (updated with feed picker button)
+// Fullscreen controls — now with audio track button
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -726,25 +830,22 @@ private fun FullscreenControls(
     isPlaying: Boolean,
     catColor: Color,
     isRotLocked: Boolean,
+    audioTracks: List<AudioTrack>,
     onPlayPause: () -> Unit,
     onReplay: () -> Unit,
     onForward: () -> Unit,
     onExitFullscreen: () -> Unit,
     onLock: () -> Unit,
     onToggleRot: () -> Unit,
-    onOpenFeedPicker: (() -> Unit)?
+    onOpenFeedPicker: (() -> Unit)?,
+    onOpenAudioPicker: (() -> Unit)?
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.40f))
-    ) {
+    val selectedAudio = audioTracks.firstOrNull { it.isSelected }
+
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.40f))) {
         // Top bar
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-                .align(Alignment.TopCenter),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp).align(Alignment.TopCenter),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onExitFullscreen) {
@@ -752,16 +853,11 @@ private fun FullscreenControls(
             }
             Spacer(Modifier.width(6.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text  = channel.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White
-                )
-                // Show current feed name if multiple feeds
-                channel.currentStream?.let { stream ->
-                    if (channel.hasMultipleFeeds) {
+                Text(channel.name, style = MaterialTheme.typography.titleMedium, color = Color.White)
+                if (channel.hasMultipleFeeds) {
+                    channel.currentStream?.let { s ->
                         Text(
-                            text  = stream.feedName + if (stream.languageNames.isNotEmpty()) " · ${stream.languageNames.first()}" else "",
+                            s.feedName + if (s.languageNames.isNotEmpty()) " · ${s.languageNames.first()}" else "",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White.copy(0.7f)
                         )
@@ -769,12 +865,25 @@ private fun FullscreenControls(
                 }
             }
             LiveBadge()
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(4.dp))
 
-            // Feed/Language picker button
+            // Audio track picker button — shows current language code
+            if (onOpenAudioPicker != null) {
+                IconButton(onClick = onOpenAudioPicker) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Filled.RecordVoiceOver, "Audio Track", tint = catColor,
+                            modifier = Modifier.size(20.dp))
+                        selectedAudio?.language?.let { lang ->
+                            Text(lang.uppercase(), style = MaterialTheme.typography.labelSmall,
+                                color = catColor)
+                        }
+                    }
+                }
+            }
+            // Feed picker button
             if (onOpenFeedPicker != null) {
                 IconButton(onClick = onOpenFeedPicker) {
-                    Icon(Icons.Filled.Language, "Change Feed", tint = catColor)
+                    Icon(Icons.Filled.Subtitles, "Change Feed", tint = catColor)
                 }
             }
             // Rotation lock
@@ -791,7 +900,7 @@ private fun FullscreenControls(
             }
         }
 
-        // Center play controls
+        // Center controls
         Row(
             modifier = Modifier.align(Alignment.Center),
             horizontalArrangement = Arrangement.spacedBy(28.dp),
@@ -805,11 +914,8 @@ private fun FullscreenControls(
                 modifier = Modifier.size(64.dp),
                 colors   = IconButtonDefaults.filledIconButtonColors(containerColor = catColor)
             ) {
-                Icon(
-                    imageVector        = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = null,
-                    modifier           = Modifier.size(40.dp)
-                )
+                Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    null, modifier = Modifier.size(40.dp))
             }
             IconButton(onClick = onForward, modifier = Modifier.size(48.dp)) {
                 Icon(Icons.Filled.Forward10, "Forward 10s", tint = Color.White, modifier = Modifier.size(36.dp))
@@ -832,15 +938,11 @@ private fun FullscreenControls(
 @Composable
 private fun EdgeLevelBars(brightnessLevel: Float, volumeLevel: Float) {
     Box(Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier.fillMaxHeight().width(5.dp).align(Alignment.CenterStart).padding(vertical = 60.dp)
-        ) {
+        Box(modifier = Modifier.fillMaxHeight().width(5.dp).align(Alignment.CenterStart).padding(vertical = 60.dp)) {
             Box(Modifier.fillMaxSize().background(Color.White.copy(0.12f), RoundedCornerShape(3.dp)))
             Box(Modifier.fillMaxWidth().fillMaxHeight(brightnessLevel.coerceIn(0.01f, 1f)).align(Alignment.BottomStart).background(Color(0xFFFBD38D).copy(0.85f), RoundedCornerShape(3.dp)))
         }
-        Box(
-            modifier = Modifier.fillMaxHeight().width(5.dp).align(Alignment.CenterEnd).padding(vertical = 60.dp)
-        ) {
+        Box(modifier = Modifier.fillMaxHeight().width(5.dp).align(Alignment.CenterEnd).padding(vertical = 60.dp)) {
             Box(Modifier.fillMaxSize().background(Color.White.copy(0.12f), RoundedCornerShape(3.dp)))
             Box(Modifier.fillMaxWidth().fillMaxHeight(volumeLevel.coerceIn(0.05f, 1f)).align(Alignment.BottomStart).background(Color(0xFF4F8EF7).copy(0.85f), RoundedCornerShape(3.dp)))
         }
@@ -848,20 +950,20 @@ private fun EdgeLevelBars(brightnessLevel: Float, volumeLevel: Float) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared small composables
+// Shared overlays
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun ThumbnailOverlay(channel: ChannelUiModel, catColor: Color, onPlay: () -> Unit) {
     Box(Modifier.fillMaxSize().background(catColor.copy(0.08f)), contentAlignment = Alignment.Center) {
-        if (channel.logoUrl != null) {
-            AsyncImage(model = channel.logoUrl, contentDescription = channel.name, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(32.dp))
-        } else {
-            Text(channel.countryFlag, style = MaterialTheme.typography.displayLarge)
-        }
+        if (channel.logoUrl != null)
+            AsyncImage(model = channel.logoUrl, contentDescription = channel.name,
+                contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(32.dp))
+        else Text(channel.countryFlag, style = MaterialTheme.typography.displayLarge)
     }
     Box(Modifier.fillMaxSize().background(Color.Black.copy(0.30f)), contentAlignment = Alignment.Center) {
-        FilledIconButton(onClick = onPlay, modifier = Modifier.size(56.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = catColor)) {
+        FilledIconButton(onClick = onPlay, modifier = Modifier.size(56.dp),
+            colors = IconButtonDefaults.filledIconButtonColors(containerColor = catColor)) {
             Icon(Icons.Filled.PlayArrow, "Play", modifier = Modifier.size(34.dp))
         }
     }
@@ -881,8 +983,64 @@ private fun ErrorOverlay(message: String, onRetry: () -> Unit) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ExoPlayer factory — always with audio enabled, rebuilds on URL change
+// ExoPlayer helpers
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Extract all audio track groups from the current Tracks object. */
+@androidx.annotation.OptIn(UnstableApi::class)
+fun extractAudioTracks(tracks: Tracks): List<AudioTrack> {
+    val result = mutableListOf<AudioTrack>()
+    tracks.groups.forEachIndexed { groupIndex, group ->
+        if (group.type != C.TRACK_TYPE_AUDIO) return@forEachIndexed
+        for (trackIndex in 0 until group.length) {
+            val format = group.getTrackFormat(trackIndex)
+            val isSelected = group.isTrackSelected(trackIndex)
+            val lang = format.language?.takeIf { it.isNotBlank() && it != "und" }
+            // Build a human-readable label
+            val label = when {
+                lang != null -> {
+                    try {
+                        val locale = Locale.forLanguageTag(lang)
+                        locale.getDisplayLanguage(Locale.ENGLISH)
+                            .takeIf { it.isNotBlank() && it != lang } ?: lang.uppercase()
+                    } catch (e: Exception) { lang.uppercase() }
+                }
+                format.label != null && format.label!!.isNotBlank() -> format.label!!
+                else -> "Audio ${result.size + 1}"
+            }
+            result.add(
+                AudioTrack(
+                    groupIndex   = groupIndex,
+                    trackIndex   = trackIndex,
+                    language     = lang,
+                    label        = label,
+                    channelCount = format.channelCount,
+                    sampleRate   = format.sampleRate,
+                    isSelected   = isSelected
+                )
+            )
+        }
+    }
+    return result
+}
+
+/** Force ExoPlayer to play a specific audio track and disable automatic selection for audio. */
+@androidx.annotation.OptIn(UnstableApi::class)
+fun selectAudioTrack(player: ExoPlayer, track: AudioTrack) {
+    val currentTracks = player.currentTracks
+    val group = currentTracks.groups.getOrNull(track.groupIndex) ?: return
+    player.trackSelectionParameters = player.trackSelectionParameters
+        .buildUpon()
+        // Override: select exactly this group+track, disable auto for audio
+        .setOverrideForType(
+            androidx.media3.common.TrackSelectionOverride(group.mediaTrackGroup, track.trackIndex)
+        )
+        // Ensure audio is never disabled
+        .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+        .build()
+    // Make sure player volume is audible
+    player.volume = 1f
+}
 
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
@@ -894,13 +1052,16 @@ private fun rememberExoPlayer(
 ): ExoPlayer? = remember(streamUrl) {
     if (streamUrl == null) return@remember null
     ExoPlayer.Builder(context).build().apply {
-        // Guarantee audio is never muted at the player level
         volume = 1f
         val src = HlsMediaSource.Factory(DefaultHttpDataSource.Factory())
             .createMediaSource(MediaItem.fromUri(Uri.parse(streamUrl)))
         setMediaSource(src)
         prepare()
         playWhenReady = autoPlay
+        // Ensure audio track type is never disabled
+        trackSelectionParameters = trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+            .build()
         addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) { onError("Stream unavailable") }
         })
@@ -908,8 +1069,8 @@ private fun rememberExoPlayer(
 }
 
 private fun categoryColorFor(channel: ChannelUiModel): Color = when {
-    channel.categories.any { it in listOf("music","entertainment") } -> MusicPurple
-    channel.categories.any { it in listOf("science","education","kids") } -> ScienceBlue
+    channel.categories.any { it in listOf("music", "entertainment") } -> MusicPurple
+    channel.categories.any { it in listOf("science", "education", "kids") } -> ScienceBlue
     channel.country.contains("Nepal", ignoreCase = true) -> NepalRed
     channel.country.contains("India", ignoreCase = true) -> IndiaOrange
     else -> Primary

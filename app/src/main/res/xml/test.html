@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>HLS Debug Player</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    body {
+      background: #121212;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+
+    input {
+      width: 70%;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      margin-bottom: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      background: #1db954;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    video {
+      width: 100%;
+      max-width: 900px;
+      margin-top: 20px;
+      border-radius: 12px;
+      background: black;
+    }
+
+    #networkLog {
+      margin-top: 20px;
+      text-align: left;
+      max-height: 300px;
+      overflow-y: auto;
+      background: #222;
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 12px;
+    }
+
+    #networkLog div {
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>HLS Debug Player</h2>
+
+  <input type="text" id="streamUrl" placeholder="Paste .m3u8 or MP4 URL here">
+  <br>
+  <button onclick="playStream()">Play Stream</button>
+
+  <video id="video" controls autoplay></video>
+
+  <div id="networkLog">
+    <b>Network & HLS Debug:</b><br>
+  </div>
+
+<script>
+  const video = document.getElementById('video');
+  const logBox = document.getElementById("networkLog");
+
+  function log(message) {
+    const entry = document.createElement("div");
+    entry.textContent = message;
+    logBox.appendChild(entry);
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  function playStream() {
+    const url = document.getElementById('streamUrl').value.trim();
+    if (!url) return;
+
+    log("Loading: " + url);
+
+    if (Hls.isSupported() && url.endsWith(".m3u8")) {
+      const hls = new Hls({ debug: true });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        log("HLS manifest parsed, starting playback...");
+        video.play();
+      });
+
+      hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+        log("Video element attached to HLS.js");
+      });
+
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        log(`HLS Error: ${data.type} - ${data.details}`);
+        if (data.fatal) {
+          log("Fatal error detected, attempting recovery...");
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls.recoverMediaError();
+          } else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            hls.startLoad();
+          } else {
+            log("Cannot recover, stopping playback.");
+          }
+        }
+      });
+
+      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (event, data) => {
+        log("Audio tracks: " + data.audioTracks.map(t => `${t.name} (${t.lang})`).join(", "));
+      });
+
+      hls.on(Hls.Events.VIDEO_TRACKS_UPDATED, (event, data) => {
+        log("Video tracks: " + data.videoTracks.map(t => `${t.name} ${t.width}x${t.height}`).join(", "));
+      });
+
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari native HLS
+      video.src = url;
+      video.play();
+    } else {
+      // MP4 or other browser-native
+      video.src = url;
+      video.play();
+    }
+  }
+
+  // Optional: log fetch/XHR requests
+  const originalFetch = window.fetch;
+  window.fetch = async function(...args) {
+    log("Fetch → " + args[0]);
+    return originalFetch.apply(this, args);
+  };
+
+  const originalOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url) {
+    log("XHR → " + url);
+    return originalOpen.apply(this, arguments);
+  };
+</script>
+
+</body>
+</html>
