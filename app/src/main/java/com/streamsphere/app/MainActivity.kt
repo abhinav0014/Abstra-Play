@@ -25,8 +25,9 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     companion object {
-        const val EXTRA_CHANNEL_ID = "extra_channel_id"
-        const val EXTRA_STREAM_URL = "extra_stream_url"
+        const val EXTRA_CHANNEL_ID  = "extra_channel_id"
+        const val EXTRA_STREAM_URL  = "extra_stream_url"
+        const val EXTRA_FULLSCREEN  = "extra_fullscreen"  // from widget tap
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,18 +35,25 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val startChannelId = intent?.getStringExtra(EXTRA_CHANNEL_ID)
+        val startChannelId  = intent?.getStringExtra(EXTRA_CHANNEL_ID)
+        val startFullscreen = intent?.getBooleanExtra(EXTRA_FULLSCREEN, false) ?: false
 
         setContent {
             StreamSphereTheme {
-                StreamSphereUI(startChannelId = startChannelId)
+                StreamSphereUI(
+                    startChannelId  = startChannelId,
+                    startFullscreen = startFullscreen
+                )
             }
         }
     }
 }
 
 @Composable
-fun StreamSphereUI(startChannelId: String? = null) {
+fun StreamSphereUI(
+    startChannelId: String? = null,
+    startFullscreen: Boolean = false
+) {
     val navController = rememberNavController()
 
     LaunchedEffect(startChannelId) {
@@ -87,9 +95,10 @@ fun StreamSphereUI(startChannelId: String? = null) {
             ) { backStack ->
                 val channelId = backStack.arguments?.getString("channelId") ?: return@composable
                 DetailScreen(
-                    channelId = channelId,
-                    autoPlay  = channelId == startChannelId,
-                    onBack    = navController::popBackStack
+                    channelId        = channelId,
+                    autoPlay         = channelId == startChannelId,
+                    startInFullscreen = startFullscreen && channelId == startChannelId,
+                    onBack           = navController::popBackStack
                 )
             }
         }
