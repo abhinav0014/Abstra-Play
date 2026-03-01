@@ -17,16 +17,13 @@ class ChannelViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<UiState<List<ChannelUiModel>>>(UiState.Loading)
     val uiState: StateFlow<UiState<List<ChannelUiModel>>> = _uiState.asStateFlow()
 
-    private val _selectedTab   = MutableStateFlow(ChannelTab.ALL)
+    private val _selectedTab = MutableStateFlow(ChannelTab.ALL)
     val selectedTab: StateFlow<ChannelTab> = _selectedTab.asStateFlow()
 
-    private val _searchQuery   = MutableStateFlow("")
+    private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    /**
-     * Stores user-chosen stream index per channel id.
-     * Survives tab/search changes without re-fetching.
-     */
+    /** Stores user-chosen stream index per channel id. Survives tab/search changes. */
     private val _streamSelections = MutableStateFlow<Map<String, Int>>(emptyMap())
 
     val favourites: StateFlow<List<FavouriteChannel>> =
@@ -37,14 +34,22 @@ class ChannelViewModel @Inject constructor(
         repo.getWidgetChannels()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    // kotlinx.coroutines combine() only accepts up to 5 parameters directly.
+    // Nest two combine() calls to merge 6 flows without an array-based overload.
     val filteredChannels: StateFlow<List<ChannelUiModel>> =
         combine(
-            _uiState, _selectedTab, _searchQuery,
-            favourites, widgetChannels, _streamSelections
-        ) { state, tab, query, favs, widgets, selections ->
+            combine(_uiState, _selectedTab, _searchQuery) { state, tab, query ->
+                Triple(state, tab, query)
+            },
+            combine(favourites, widgetChannels, _streamSelections) { favs, widgets, sels ->
+                Triple(favs, widgets, sels)
+            }
+        ) { (state, tab, query), (favs, widgets, selections) ->
             val favIds    = favs.map { it.id }.toSet()
             val widgetIds = widgets.map { it.id }.toSet()
-            val all = (state as? UiState.Success)?.data ?: return@combine emptyList()
+            val all = (state as? UiState.Success<List<ChannelUiModel>>)?.data
+                ?: return@combine emptyList()
+
             all.map { ch ->
                 ch.copy(
                     isFavourite         = ch.id in favIds,
@@ -56,8 +61,8 @@ class ChannelViewModel @Inject constructor(
                     ChannelTab.ALL     -> true
                     ChannelTab.NEPAL   -> ch.country == "Nepal" || ch.country == "NP"
                     ChannelTab.INDIA   -> ch.country == "India" || ch.country == "IN"
-                    ChannelTab.SCIENCE -> ch.categories.any { it in listOf("science","education","kids") }
-                    ChannelTab.MUSIC   -> ch.categories.any { it in listOf("music","entertainment") }
+                    ChannelTab.SCIENCE -> ch.categories.any { it in listOf("science", "education", "kids") }
+                    ChannelTab.MUSIC   -> ch.categories.any { it in listOf("music", "entertainment") }
                 }
                 val matchesQuery = query.isBlank() ||
                     ch.name.contains(query, ignoreCase = true) ||
@@ -79,10 +84,10 @@ class ChannelViewModel @Inject constructor(
         }
     }
 
-    fun selectTab(tab: ChannelTab)   { _selectedTab.value = tab }
-    fun setSearchQuery(q: String)    { _searchQuery.value = q }
+    fun selectTab(tab: ChannelTab) { _selectedTab.value = tab }
+    fun setSearchQuery(q: String)  { _searchQuery.value = q }
 
-    /** User picked a specific feed/stream index for a channel. */
+    /** Called when user picks a feed/stream from the picker. */
     fun selectStream(channelId: String, index: Int) {
         _streamSelections.value = _streamSelections.value + (channelId to index)
     }
