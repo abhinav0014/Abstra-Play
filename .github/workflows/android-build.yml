@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Decode keystore
-         run: |
+        run: |
              echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > keystore.jks
       - name: Checkout
         uses: actions/checkout@v4
