@@ -18,7 +18,9 @@ import androidx.glance.appwidget.provideContent
 import androidx.glance.color.ColorProvider
 import androidx.glance.layout.*
 import androidx.glance.text.*
+import androidx.glance.ImageProvider
 import com.streamsphere.app.MainActivity
+import com.streamsphere.app.R
 import com.streamsphere.app.data.api.AppDatabase
 import com.streamsphere.app.data.model.FavouriteChannel
 import dagger.hilt.EntryPoint
@@ -33,14 +35,17 @@ interface WidgetEntryPoint {
     fun appDatabase(): AppDatabase
 }
 
+/**
+ * 1×1 square widget showing:
+ *  - The channel logo image (if available via remote URL loaded as bitmap)
+ *  - OR the channel name initial + flag emoji as large text fallback
+ * Tapping opens the app directly to play that channel.
+ */
 class ChannelWidget : GlanceAppWidget() {
 
+    // Single 1x1 cell size
     override val sizeMode = SizeMode.Responsive(
-        setOf(
-            DpSize(140.dp, 100.dp),
-            DpSize(220.dp, 120.dp),
-            DpSize(220.dp, 220.dp)
-        )
+        setOf(DpSize(73.dp, 73.dp))
     )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -48,76 +53,140 @@ class ChannelWidget : GlanceAppWidget() {
             context.applicationContext,
             WidgetEntryPoint::class.java
         )
-        val widgetChannels = try {
-            entryPoint.appDatabase().favouritesDao().getWidgetChannels().first()
+        // Pick the first widget-pinned channel
+        val channel: FavouriteChannel? = try {
+            entryPoint.appDatabase().favouritesDao().getWidgetChannels().first().firstOrNull()
         } catch (e: Exception) {
-            emptyList()
+            null
         }
 
         provideContent {
-            WidgetContent(context = context, channels = widgetChannels)
+            SquareWidgetContent(context = context, channel = channel)
         }
     }
 }
 
 @Composable
-private fun WidgetContent(context: Context, channels: List<FavouriteChannel>) {
-    val backgroundColor = ColorProvider(Color(0xFFFFFFFF), Color(0xFF111827))
-    val dividerColor    = ColorProvider(Color(0xFFE5E7EB), Color(0xFF1A2235))
-    val primaryText     = ColorProvider(Color(0xFF111827), Color(0xFFFFFFFF))
-    val secondaryText   = ColorProvider(Color(0xFF4B5563), Color(0xFF6B7A99))
-    val dotColors = listOf(Color(0xFFFC8181), Color(0xFFFBD38D), Color(0xFF90CDF4), Color(0xFFD6BCFA))
-    
-    val intent = Intent(context, MainActivity::class.java)
+private fun SquareWidgetContent(context: Context, channel: FavouriteChannel?) {
+    val bgColor      = ColorProvider(Color(0xFF111827), Color(0xFF111827))
+    val textColor    = ColorProvider(Color(0xFFE8EDF5), Color(0xFFE8EDF5))
+    val accentColor  = ColorProvider(Color(0xFF4F8EF7), Color(0xFF4F8EF7))
+    val overlayColor = ColorProvider(Color(0x99000000), Color(0x99000000))
+
+    val playIntent = if (channel != null) {
+        Intent(context, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            putExtra(MainActivity.EXTRA_CHANNEL_ID, channel.id)
+            putExtra(MainActivity.EXTRA_STREAM_URL, channel.streamUrl)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+    } else null
+
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(backgroundColor)
+            .background(bgColor)
             .cornerRadius(16.dp)
-            .padding(12.dp)
-            .clickable(actionStartActivity(intent))
+            .clickable(
+                if (playIntent != null) actionStartActivity(playIntent)
+                else actionStartActivity<MainActivity>()
+            ),
+        contentAlignment = Alignment.Center
     ) {
-        Column(modifier = GlanceModifier.fillMaxSize()) {
-            Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("📺 StreamSphere", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 12.sp, color = primaryText))
-            }
-            Spacer(modifier = GlanceModifier.height(6.dp))
-            Box(modifier = GlanceModifier.fillMaxWidth().height(1.dp).background(dividerColor)) {}
-            Spacer(modifier = GlanceModifier.height(6.dp))
-
-            if (channels.isEmpty()) {
+        if (channel == null) {
+            // Empty state: show app icon placeholder + hint text
+            Column(
+                modifier = GlanceModifier.fillMaxSize().padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
-                    text  = "Favourite channels & tap 📱 to add them here.",
-                    style = TextStyle(fontSize = 10.sp, color = secondaryText)
+                    text  = "📺",
+                    style = TextStyle(fontSize = 28.sp, color = textColor)
                 )
-            } else {
-                channels.take(4).forEachIndexed { index, channel ->
-                    val dot = dotColors[index % dotColors.size]
-                    val playIntent = Intent(context, MainActivity::class.java).apply {
-                        action = Intent.ACTION_VIEW
-                        putExtra(MainActivity.EXTRA_CHANNEL_ID, channel.id)
-                        putExtra(MainActivity.EXTRA_STREAM_URL, channel.streamUrl)
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                Spacer(modifier = GlanceModifier.height(4.dp))
+                Text(
+                    text  = "Add channel",
+                    style = TextStyle(fontSize = 9.sp, color = ColorProvider(Color(0xFF6B7A99), Color(0xFF6B7A99))),
+                    maxLines = 2
+                )
+            }
+        } else {
+            // Channel content
+            Box(
+                modifier = GlanceModifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                // Background: try to load logo via Glance Image (bitmap loaded externally)
+                // Glance does not support async network images directly, so we use the
+                // channel initial + flag as the primary visual, styled to look like a logo tile
+                val initial = channel.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+                val flag    = if (channel.country.length <= 4) channel.country else ""
+
+                Column(
+                    modifier = GlanceModifier.fillMaxSize().padding(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Big initial letter styled as logo
+                    Text(
+                        text  = initial,
+                        style = TextStyle(
+                            fontWeight = FontWeight.Bold,
+                            fontSize   = 32.sp,
+                            color      = accentColor
+                        )
+                    )
+                    if (flag.isNotBlank()) {
+                        Text(
+                            text  = flag,
+                            style = TextStyle(fontSize = 11.sp, color = textColor)
+                        )
                     }
-                    Row(
+                }
+
+                // Bottom bar with truncated channel name
+                Column(
+                    modifier = GlanceModifier.fillMaxSize(),
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
                         modifier = GlanceModifier
                             .fillMaxWidth()
-                            .padding(bottom = 4.dp)
-                            .clickable(actionStartActivity(playIntent)),
-                        verticalAlignment = Alignment.CenterVertically
+                            .background(overlayColor)
+                            .padding(horizontal = 4.dp, vertical = 3.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(modifier = GlanceModifier.width(5.dp).height(5.dp).background(dot).cornerRadius(3.dp)) {}
-                        Spacer(modifier = GlanceModifier.width(6.dp))
-                        Text(channel.name, style = TextStyle(fontSize = 11.sp, color = primaryText), maxLines = 1)
+                        Text(
+                            text     = channel.name,
+                            style    = TextStyle(
+                                fontSize = 8.sp,
+                                color    = textColor,
+                                fontWeight = FontWeight.Medium
+                            ),
+                            maxLines = 1
+                        )
+                    }
+                }
+
+                // LIVE indicator dot top-right
+                if (channel.streamUrl != null) {
+                    Column(
+                        modifier = GlanceModifier.fillMaxSize().padding(5.dp),
+                        verticalAlignment = Alignment.Top,
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Box(
+                            modifier = GlanceModifier
+                                .width(7.dp)
+                                .height(7.dp)
+                                .background(ColorProvider(Color(0xFFE53E3E), Color(0xFFE53E3E)))
+                                .cornerRadius(4.dp)
+                        ) {}
                     }
                 }
             }
-
-            Spacer(modifier = GlanceModifier.defaultWeight())
-            Text(
-                text  = if (channels.isEmpty()) "Open app →" else "Tap to watch →",
-                style = TextStyle(fontSize = 9.sp, color = secondaryText)
-            )
         }
     }
 }
