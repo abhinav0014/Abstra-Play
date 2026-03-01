@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.view.WindowInsetsController
 import android.widget.FrameLayout
 import androidx.compose.animation.*
