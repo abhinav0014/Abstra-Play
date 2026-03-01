@@ -42,9 +42,13 @@ class ChannelRepository @Inject constructor(
         val targetCategories = setOf("science", "education", "music", "entertainment", "kids")
 
         return channels
-            .filter { ch ->
+            /*.filter { ch ->
                 !ch.isNsfw && ch.closed == null &&
                 (ch.country in targetCountries || ch.categories.any { it in targetCategories })
+            }*/
+            .filter { ch -> 
+              !ch.isNsfw && ch.closed == null && streams.containsKey(ch.id) && (ch.country in targetCountries || ch.categories.any { it in targetCategories })
+              
             }
             .map { ch ->
                 val country = countries[ch.country]
