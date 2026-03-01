@@ -80,7 +80,7 @@ private fun SquareWidgetContent(context: Context, channel: FavouriteChannel?) {
             putExtra(MainActivity.EXTRA_STREAM_URL, channel.streamUrl)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-    } else null
+    } else Intent(context, MainActivity::class.java)
 
     Box(
         modifier = GlanceModifier
@@ -88,8 +88,7 @@ private fun SquareWidgetContent(context: Context, channel: FavouriteChannel?) {
             .background(bgColor)
             .cornerRadius(16.dp)
             .clickable(
-                if (playIntent != null) actionStartActivity(playIntent)
-                else actionStartActivity<MainActivity>()
+               actionStartActivity(playIntent)
             ),
         contentAlignment = Alignment.Center
     ) {

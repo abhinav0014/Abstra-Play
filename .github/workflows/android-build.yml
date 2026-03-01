@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Decode keystore
+         run: |
+             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > keystore.jks
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -26,6 +29,10 @@ jobs:
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
