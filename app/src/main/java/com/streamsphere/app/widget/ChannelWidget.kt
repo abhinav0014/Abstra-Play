@@ -113,8 +113,7 @@ private fun SquareWidgetContent(
             ) {
                 Text("📺", style = TextStyle(fontSize = 26.sp, color = textColor))
                 Spacer(modifier = GlanceModifier.height(3.dp))
-                Text("Add
-channel", style = TextStyle(fontSize = 8.sp, color = mutedColor), maxLines = 2)
+                Text("Add channel", style = TextStyle(fontSize = 8.sp, color = mutedColor), maxLines = 2)
             }
         } else {
             Box(
