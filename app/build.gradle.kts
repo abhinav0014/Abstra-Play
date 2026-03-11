@@ -41,13 +41,6 @@ android {
           signingConfig = signingConfigs.getByName("release")
         }
     }
-
-    applicationVariants.all {
-    outputs.all {
-        (this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl)?.let { output ->
-            output.outputFileName = "${project.findProperty("APP_ID")}.apk"
-        }
-    }
 }
 
     compileOptions {
