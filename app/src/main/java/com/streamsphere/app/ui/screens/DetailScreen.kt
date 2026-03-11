@@ -276,49 +276,41 @@ private fun DetailContent(
                     }
                 }
         ) {
-            // Fullscreen button — top-right
-            Box(modifier = Modifier.align(Alignment.TopEnd)) {
-                AnimatedVisibility(
-                    visible = controlsVisible,
-                    enter   = fadeIn(),
-                    exit    = fadeOut()
+            // Fullscreen button — top-right, shown when controls visible
+            if (controlsVisible) {
+                IconButton(
+                    onClick  = onEnterFullscreen,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
                 ) {
-                    IconButton(
-                        onClick  = onEnterFullscreen,
-                        modifier = Modifier.padding(4.dp)
-                    ) {
-                        Icon(
-                            Icons.Filled.Fullscreen, "Fullscreen",
-                            tint     = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
+                    Icon(
+                        Icons.Filled.Fullscreen, "Fullscreen",
+                        tint     = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
                 }
             }
 
-            // Play/pause button — center
-            Box(modifier = Modifier.align(Alignment.Center)) {
-                AnimatedVisibility(
-                    visible = controlsVisible,
-                    enter   = fadeIn() + scaleIn(initialScale = 0.8f),
-                    exit    = fadeOut() + scaleOut(targetScale = 0.8f)
+            // Play/pause button — center, shown when controls visible
+            if (controlsVisible) {
+                FilledIconButton(
+                    onClick  = {
+                        lastInteraction = System.currentTimeMillis()
+                        if (isPlaying) exoPlayer.pause() else exoPlayer.play()
+                    },
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(52.dp),
+                    colors   = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = catColor.copy(alpha = 0.85f)
+                    )
                 ) {
-                    FilledIconButton(
-                        onClick  = {
-                            lastInteraction = System.currentTimeMillis()
-                            if (isPlaying) exoPlayer.pause() else exoPlayer.play()
-                        },
-                        modifier = Modifier.size(52.dp),
-                        colors   = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = catColor.copy(alpha = 0.85f)
-                        )
-                    ) {
-                        Icon(
-                            imageVector        = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = null,
-                            modifier           = Modifier.size(32.dp)
-                        )
-                    }
+                    Icon(
+                        imageVector        = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        modifier           = Modifier.size(32.dp)
+                    )
                 }
             }
         }
