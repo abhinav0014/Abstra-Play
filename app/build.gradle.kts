@@ -52,9 +52,9 @@ android {
 
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
-            val appId = project.property("APP_ID")
-            if (output is com.android.build.gradle.internal.api.BaseVariantOutputImpl) {
-                output.outputFileName = "$appId.apk"
+            val outputImpl = output as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            outputImpl?.let {
+                it.outputFileName = "${variant.name}-${variant.versionName}.apk"
             }
         }
     }
