@@ -14,6 +14,7 @@ import android.widget.FrameLayout
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -57,6 +58,7 @@ import com.streamsphere.app.viewmodel.ChannelViewModel
 import kotlinx.coroutines.delay
 import java.util.Locale
 import kotlin.math.roundToInt
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Audio track data class
@@ -275,46 +277,48 @@ private fun DetailContent(
                 }
         ) {
             // Fullscreen button — top-right
-            AnimatedVisibility(
-                visible = controlsVisible,
-                enter   = fadeIn(),
-                exit    = fadeOut(),
-                modifier = Modifier.align(Alignment.TopEnd)
-            ) {
-                IconButton(
-                    onClick  = onEnterFullscreen,
-                    modifier = Modifier.padding(4.dp)
+            Box(modifier = Modifier.align(Alignment.TopEnd)) {
+                AnimatedVisibility(
+                    visible = controlsVisible,
+                    enter   = fadeIn(),
+                    exit    = fadeOut()
                 ) {
-                    Icon(
-                        Icons.Filled.Fullscreen, "Fullscreen",
-                        tint     = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
+                    IconButton(
+                        onClick  = onEnterFullscreen,
+                        modifier = Modifier.padding(4.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.Fullscreen, "Fullscreen",
+                            tint     = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
             }
 
             // Play/pause button — center
-            AnimatedVisibility(
-                visible  = controlsVisible,
-                enter    = fadeIn() + scaleIn(initialScale = 0.8f),
-                exit     = fadeOut() + scaleOut(targetScale = 0.8f),
-                modifier = Modifier.align(Alignment.Center)
-            ) {
-                FilledIconButton(
-                    onClick  = {
-                        lastInteraction = System.currentTimeMillis()
-                        if (isPlaying) exoPlayer.pause() else exoPlayer.play()
-                    },
-                    modifier = Modifier.size(52.dp),
-                    colors   = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = catColor.copy(alpha = 0.85f)
-                    )
+            Box(modifier = Modifier.align(Alignment.Center)) {
+                AnimatedVisibility(
+                    visible = controlsVisible,
+                    enter   = fadeIn() + scaleIn(initialScale = 0.8f),
+                    exit    = fadeOut() + scaleOut(targetScale = 0.8f)
                 ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(32.dp)
-                    )
+                    FilledIconButton(
+                        onClick  = {
+                            lastInteraction = System.currentTimeMillis()
+                            if (isPlaying) exoPlayer.pause() else exoPlayer.play()
+                        },
+                        modifier = Modifier.size(52.dp),
+                        colors   = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = catColor.copy(alpha = 0.85f)
+                        )
+                    ) {
+                        Icon(
+                            imageVector        = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                            modifier           = Modifier.size(32.dp)
+                        )
+                    }
                 }
             }
         }

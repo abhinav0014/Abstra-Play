@@ -50,11 +50,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             }
             item { Spacer(Modifier.height(8.dp)) }
             item { SettingsSectionHeader("Appearance") }
-            item { SettingsToggleItem(Icons.Outlined.DarkMode, "Dark Theme", "Use dark background", darkMode) { darkMode = it } }
-            item { SettingsToggleItem(Icons.Outlined.ViewCompact, "Compact View", "Show more channels per row", compactView) { compactView = it } }
+            item { SettingsToggleItem(Icons.Outlined.DarkMode,       "Dark Theme",     "Use dark background",                   darkMode)      { viewModel.setDarkMode(it) } }
+            item { SettingsToggleItem(Icons.Outlined.ViewCompact,    "Compact View",   "Show more channels per row",            compactView)   { viewModel.setCompactView(it) } }
             item { Spacer(Modifier.height(8.dp)) }
             item { SettingsSectionHeader("Notifications") }
-            item { SettingsToggleItem(Icons.Outlined.Notifications, "Channel Alerts", "Notify when favourite channels go live", notifications) { notifications = it } }
+            item { SettingsToggleItem(Icons.Outlined.Notifications,  "Channel Alerts", "Notify when favourite channels go live", notifications) { viewModel.setNotifications(it) } }
             item { Spacer(Modifier.height(8.dp)) }
             item { SettingsSectionHeader("About") }
             item {

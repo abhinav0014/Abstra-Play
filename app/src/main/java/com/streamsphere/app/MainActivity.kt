@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels                          // ← ADD
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,9 +20,31 @@ import androidx.navigation.compose.*
 import com.streamsphere.app.ui.navigation.*
 import com.streamsphere.app.ui.screens.*
 import com.streamsphere.app.ui.theme.StreamSphereTheme
+import com.streamsphere.app.viewmodel.SettingsViewModel     // ← ADD
 import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() {
 
+    companion object {
+        const val EXTRA_CHANNEL_ID  = "extra_channel_id"
+        const val EXTRA_STREAM_URL  = "extra_stream_url"
+        const val EXTRA_FULLSCREEN  = "extra_fullscreen"
+    }
+
+      // ← ADD THIS LINE
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+
+        val startChannelId  = intent?.getStringExtra(EXTRA_CHANNEL_ID)
+        val startFullscreen = intent?.getBooleanExtra(EXTRA_FULLSCREEN, false) ?: false
+
+        
+    }
+}
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -31,7 +54,9 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_STREAM_URL  = "extra_stream_url"
         const val EXTRA_FULLSCREEN  = "extra_fullscreen"  // from widget tap
     }
-
+    
+    private val settingsViewModel: SettingsViewModel by viewModels()
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -40,9 +65,9 @@ class MainActivity : ComponentActivity() {
         val startChannelId  = intent?.getStringExtra(EXTRA_CHANNEL_ID)
         val startFullscreen = intent?.getBooleanExtra(EXTRA_FULLSCREEN, false) ?: false
         
-        val darkMode by settingsViewModel.darkMode.collectAsState()
-        
         setContent {
+            val darkMode by settingsViewModel.darkMode.collectAsState()  // ← MOVE inside setContent
+
             StreamSphereTheme(darkTheme = darkMode) {
                 StreamSphereUI(
                     startChannelId  = startChannelId,
