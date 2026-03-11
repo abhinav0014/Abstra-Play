@@ -2,9 +2,9 @@ name: Android CI
 
 on:
   push:
-    branches: [ "production" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "production" ]
+    branches: [ "main" ]
     
 env:
   APPVAULT_REPO: "abhinav0014/app-vault"
