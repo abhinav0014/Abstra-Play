@@ -1,244 +1,194 @@
 name: Android CI
 
 on:
-  push:
-    branches: [ "production" ]
-  pull_request:
-    branches: [ "production" ]
-    
+push:
+branches: [ "production" ]
+
+permissions: contents: write
+
 env:
-  APPVAULT_REPO: "abhinav0014/app-vault"
-  APP_ID:        "livetv-player"
+APPVAULT_REPO: "abhinav0014/app-vault"
+APP_ID: "livetv-player"
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+build:
+runs-on: ubuntu-latest
+outputs:
+apk_name: app-release.apk
 
-      - name: Decode keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystore.jks
+steps:
+  - name: Checkout
+    uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-          cache: gradle
+  - name: Decode keystore
+    run: |
+      echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystore.jks
 
-      - name: Grant execute permission
-        run: chmod +x ./gradlew
+  - name: Set up JDK 17
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: 17
+      cache: gradle
 
-      - name: Build Release APK
-        run: ./gradlew assembleRelease
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS:         ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD:      ${{ secrets.KEY_PASSWORD }}
+  - name: Grant execute permission
+    run: chmod +x ./gradlew
 
-      - name: Upload APK artifact
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: app/build/outputs/apk/debug/app-debug.apk
+  - name: Build Release APK
+    run: ./gradlew assembleRelease
+    env:
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Create GitHub Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
-        id: release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "build-${{ github.run_number }}"
-          name: "Release build #${{ github.run_number }}"
-          body: "Automated release from commit ${{ github.sha }}"
-          files: app/build/outputs/apk/release/app-release.apk
-          token: ${{ secrets.GITHUB_TOKEN }}
+  - name: Upload APK artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: release-apk
+      path: app/build/outputs/apk/release/app-release.apk
 
-      - name: Convert app icon to PNG
-        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
-        run: |
-          sudo apt-get install -y inkscape 2>/dev/null || true
+release:
+runs-on: ubuntu-latest
+needs: build
+outputs:
+download_url: ${{ steps.url.outputs.download_url }}
 
-          ICON_SRC="app/src/main/res/drawable/ic_splash_logo.xml"
-          ICON_OUT="icon.png"
+steps:
+  - name: Download APK artifact
+    uses: actions/download-artifact@v4
+    with:
+      name: release-apk
+      path: .
 
-          if [ -f "$ICON_SRC" ]; then
-            inkscape "$ICON_SRC" \
-              --export-type=png \
-              --export-filename="$ICON_OUT" \
-              --export-width=256 \
-              --export-height=256 \
-              2>/dev/null || true
-          fi
+  - name: Create GitHub Release
+    id: release
+    uses: softprops/action-gh-release@v2
+    with:
+      tag_name: "build-${{ github.run_number }}"
+      name: "Release build #${{ github.run_number }}"
+      body: "Automated release from commit ${{ github.sha }}"
+      files: app-release.apk
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-          if [ ! -s "$ICON_OUT" ]; then
-            sudo apt-get install -y imagemagick 2>/dev/null || true
-            convert -size 256x256 \
-              gradient:"#1a0533-#6d28d9" \
-              -gravity Center \
-              -font DejaVu-Sans-Bold \
-              -pointsize 80 \
-              -fill white \
-              -annotate 0 "📺" \
-              "$ICON_OUT" 2>/dev/null || \
-            convert -size 256x256 xc:"#6d28d9" "$ICON_OUT"
-          fi
+  - name: Set download URL
+    id: url
+    run: |
+      echo "download_url=https://github.com/${{ github.repository }}/releases/download/build-${{ github.run_number }}/app-release.apk" >> $GITHUB_OUTPUT
 
-          echo "icon_ready=true" >> $GITHUB_ENV
-          ls -lh "$ICON_OUT"
+appvault:
+runs-on: ubuntu-latest
+needs: release
 
-      - name: Fetch repo stats
-        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
-        id: stats
-        run: |
-          REPO="${{ github.repository }}"
+steps:
+  - name: Checkout AppVault repo
+    uses: actions/checkout@v4
+    with:
+      repository: ${{ env.APPVAULT_REPO }}
+      token: ${{ secrets.APPVAULT_TOKEN }}
+      path: appvault
 
-          DATA=$(curl -s \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${REPO}")
+  - name: Fetch repo stats
+    id: stats
+    run: |
+      REPO="${{ github.repository }}"
 
-          STARS=$(echo "$DATA" | python3 -c \
-            "import sys,json; print(json.load(sys.stdin).get('stargazers_count',0))")
+      DATA=$(curl -s \
+        -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+        https://api.github.com/repos/${REPO})
 
-          RELEASES=$(curl -s \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${REPO}/releases")
+      STARS=$(echo "$DATA" | python3 -c "import sys,json; print(json.load(sys.stdin)['stargazers_count'])")
 
-          DOWNLOADS=$(echo "$RELEASES" | python3 -c "
-          import sys, json
-          releases = json.load(sys.stdin)
-          total = sum(
-            a.get('download_count', 0)
-            for r in releases
-            for a in r.get('assets', [])
-            if a.get('name','').endswith('.apk')
-          )
-          print(total)
-          ")
+      RELEASES=$(curl -s \
+        -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+        https://api.github.com/repos/${REPO}/releases)
 
-          APK_SIZE=$(du -sh app/build/outputs/apk/release/app-release.apk \
-            2>/dev/null | cut -f1 || echo "?")
+      DOWNLOADS=$(echo "$RELEASES" | python3 -c "
+      import sys,json
+      releases=json.load(sys.stdin)
+      total=sum(
+          a.get('download_count',0)
+          for r in releases
+          for a in r.get('assets',[])
+          if a.get('name','').endswith('.apk')
+      )
+      print(total)
+      ")
 
-          # Permanent direct download URL from the GitHub Release
-          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/build-${{ github.run_number }}/app-release.apk"
+      echo "stars=$STARS" >> $GITHUB_OUTPUT
+      echo "downloads=$DOWNLOADS" >> $GITHUB_OUTPUT
 
-          echo "stars=$STARS"               >> $GITHUB_OUTPUT
-          echo "downloads=$DOWNLOADS"       >> $GITHUB_OUTPUT
-          echo "apk_size=$APK_SIZE"         >> $GITHUB_OUTPUT
-          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+  - name: Generate icon
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y imagemagick
+      convert -size 256x256 xc:"#6d28d9" icon.png
 
-      - name: Read app-metadata.json
-        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
-        id: appmeta
-        run: |
-          if [ -f "app-metadata.json" ]; then
-            echo "found=true" >> $GITHUB_OUTPUT
-          else
-            echo "found=false" >> $GITHUB_OUTPUT
-          fi
+  - name: Copy icon to AppVault
+    run: |
+      mkdir -p appvault/icons
+      cp icon.png appvault/icons/${{ env.APP_ID }}.png
 
-      - name: Checkout AppVault repo
-        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.APPVAULT_REPO }}
-          token: ${{ secrets.APPVAULT_TOKEN }}
-          path: appvault
+  - name: Update apps.json
+    run: |
+      cd appvault
 
-      - name: Copy icon to AppVault
-        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
-        run: |
-          mkdir -p appvault/icons
-          if [ -f "icon.png" ]; then
-            cp icon.png "appvault/icons/${{ env.APP_ID }}.png"
-          fi
+      python3 << 'PYEOF'
+      import json, os, datetime
 
-      - name: Update apps.json
-        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
-        run: |
-          cd appvault
+      JSON_PATH = "apps.json"
 
-          python3 << 'PYEOF'
-          import json, os, datetime
+      try:
+          with open(JSON_PATH) as f:
+              apps = json.load(f)
+      except:
+          apps = []
 
-          JSON_PATH = "apps.json"
-          META_PATH = f"../{os.environ.get('APP_ID', 'app')}-metadata.json"
-          if not os.path.exists(META_PATH):
-              META_PATH = "../app-metadata.json"
+      app_id = os.environ["APP_ID"]
+      stars = int(os.environ["STARS"])
+      downloads = int(os.environ["DOWNLOADS"])
+      sha = os.environ["GITHUB_SHA"][:7]
+      repo = os.environ["GITHUB_REPOSITORY"]
+      today = datetime.date.today().isoformat()
+      download_url = os.environ["DOWNLOAD_URL"]
 
-          try:
-              with open(JSON_PATH) as f:
-                  apps = json.load(f)
-          except (FileNotFoundError, json.JSONDecodeError):
-              apps = []
+      entry = {
+          "id": app_id,
+          "name": app_id.replace("-", " ").title(),
+          "version": sha,
+          "description": "Android app",
+          "iconUrl": f"icons/{app_id}.png",
+          "downloadUrl": download_url,
+          "downloads": downloads,
+          "stars": stars,
+          "updated": today,
+          "commit": sha
+      }
 
-          try:
-              with open(META_PATH) as f:
-                  meta = json.load(f)
-          except (FileNotFoundError, json.JSONDecodeError):
-              meta = {}
+      existing = next((a for a in apps if a["id"] == app_id), None)
 
-          app_id       = os.environ["APP_ID"]
-          stars        = int(os.environ["STARS"])
-          downloads    = int(os.environ["DOWNLOADS"])
-          apk_size     = os.environ["APK_SIZE"]
-          sha          = os.environ["GITHUB_SHA"][:7]
-          repo         = os.environ["GITHUB_REPOSITORY"]
-          today        = datetime.date.today().isoformat()
-          download_url = os.environ["DOWNLOAD_URL"]
+      if existing:
+          existing.update(entry)
+      else:
+          apps.append(entry)
 
-          icon_url = f"icons/{app_id}.png"
+      with open(JSON_PATH, "w") as f:
+          json.dump(apps, f, indent=2)
 
-          entry = {
-              "id":          app_id,
-              "name":        meta.get("name",        app_id.replace("-"," ").title()),
-              "version":     meta.get("version",     sha),
-              "description": meta.get("description", "An Android app."),
-              "iconUrl":     icon_url,
-              "iconBg":      meta.get("iconBg",      "linear-gradient(135deg,#1a0533,#6d28d9)"),
-              "tags":        meta.get("tags",        ["android"]),
-              "platforms":   meta.get("platforms",   ["android"]),
-              "downloadUrl": download_url,
-              "apkSize":     apk_size,
-              "downloads":   downloads,
-              "stars":       stars,
-              "updated":     today,
-              "commit":      sha,
-          }
+      print("Updated apps.json")
+      PYEOF
+    env:
+      APP_ID: ${{ env.APP_ID }}
+      STARS: ${{ steps.stats.outputs.stars }}
+      DOWNLOADS: ${{ steps.stats.outputs.downloads }}
+      DOWNLOAD_URL: https://github.com/${{ github.repository }}/releases/download/build-${{ github.run_number }}/app-release.apk
 
-          existing = next((a for a in apps if a["id"] == app_id), None)
-          if existing:
-              existing.update(entry)
-          else:
-              apps.append(entry)
-
-          with open(JSON_PATH, "w") as f:
-              json.dump(apps, f, indent=2)
-
-          print(f"✓ Upserted {app_id} in apps.json")
-          PYEOF
-        env:
-          APP_ID:        ${{ env.APP_ID }}
-          STARS:         ${{ steps.stats.outputs.stars }}
-          DOWNLOADS:     ${{ steps.stats.outputs.downloads }}
-          APK_SIZE:      ${{ steps.stats.outputs.apk_size }}
-          DOWNLOAD_URL:  ${{ steps.stats.outputs.download_url }}
-          GITHUB_RUN_ID: ${{ github.run_id }}
-
-      - name: Publish to AppVault
-        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
-        run: |
-          cd appvault
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add apps.json icons/
-          git diff --staged --quiet \
-            && echo "ℹ️ No changes to publish" \
-            && exit 0
-          git commit -m "chore(${{ env.APP_ID }}): update from ${{ github.repository }}@${{ github.sha }}"
-          git push
-          echo "✅ AppVault updated!"
+  - name: Publish to AppVault
+    run: |
+      cd appvault
+      git config user.name "github-actions[bot]"
+      git config user.email "github-actions[bot]@users.noreply.github.com"
+      git add apps.json icons/
+      git commit -m "chore(${{ env.APP_ID }}): update from ${{ github.repository }}@${{ github.sha }}" || exit 0
+      git push
