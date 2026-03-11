@@ -16,6 +16,13 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+    splits {
+        abi {
+            enable true
+            reset()
+            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+        }
+    }
     
     signingConfigs {
         create("release") {
@@ -39,6 +46,15 @@ android {
         
         debug {
           signingConfig = signingConfigs.getByName("release")
+        }
+    }
+    
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            val appId = project.findProperty("APP_ID") ?: "myapp"
+            if (outputFileName.endsWith(".apk")) {
+                outputFileName = "$appId.apk"
+            }
         }
     }
 
