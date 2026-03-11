@@ -2,6 +2,7 @@ buildscript {
     repositories {
         maven { url = uri("https://dl.google.com/dl/android/maven2/") }
         maven { url = uri("https://repo1.maven.org/maven2/") }
+        flatDir { dirs 'libs' }
         gradlePluginPortal()
     }
     dependencies {

@@ -107,7 +107,7 @@ dependencies {
 
     // Media3 / ExoPlayer
     val media3Version = "1.9.2"
-    implementation("io.github.jellyfin:media3-ffmpeg-decoder:1.9.0+1")
+    implementation("name: 'ffmpeg-decoder', ext: 'aar'")
     implementation("androidx.media3:media3-exoplayer:$media3Version")
     implementation("androidx.media3:media3-exoplayer-hls:$media3Version")
     implementation("androidx.media3:media3-ui:$media3Version")
