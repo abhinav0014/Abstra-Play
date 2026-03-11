@@ -106,7 +106,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     // Media3 / ExoPlayer
-    val media3Version = "1.9.2"
+    val media3Version = "1.3.1"
     implementation(files("libs/ffmpeg-decoder.aar"))
 
     implementation("androidx.media3:media3-exoplayer:$media3Version")
