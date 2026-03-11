@@ -49,6 +49,7 @@ android {
           signingConfig = signingConfigs.getByName("release")
         }
     }
+<<<<<<< HEAD
 
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
@@ -57,8 +58,19 @@ android {
                 // rename the APK
                 outputFileName = "${variant.name}-${variant.versionName}.apk"
             }
+=======
+    
+    applicationVariants.all {
+    val variant = this
+    outputs.map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
+        .forEach { output ->
+            val abi = output.getFilter(com.android.build.OutputFile.ABI) ?: "universal"
+            val appId = System.getenv("APP_ID") ?: "myapp"
+
+            output.outputFileName = "${appId}-${variant.versionName}-${abi}.apk"
+>>>>>>> 1c52eb6 (jdjdjfndj)
         }
-    }
+}
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -10,12 +10,11 @@ permissions:
 env:
   APPVAULT_REPO: "abhinav0014/app-vault"
   APP_ID: "livetv-player"
+  APK_NAME: "livetv-player.apk"   # ← single source of truth
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      apk_name: app-release.apk
 
     steps:
       - name: Checkout
@@ -36,17 +35,21 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build APK
-        run: ./gradlew assembleRelease -PAPP_ID=${{ env.APP_ID }}
+        run: ./gradlew assembleRelease
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          APP_ID: ${{ env.APP_ID }}
+
+      - name: Rename APK to universal name
+        run: mv app/build/outputs/apk/release/app-release.apk ${{ env.APK_NAME }}
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: ${{ env.APK_NAME }}
 
   release:
     runs-on: ubuntu-latest
@@ -68,14 +71,14 @@ jobs:
           tag_name: "build-${{ github.run_number }}"
           name: "Release build #${{ github.run_number }}"
           body: "Automated release from commit ${{ github.sha }}"
-          files: app-release.apk
+          files: ${{ env.APK_NAME }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set download URL
         id: url
         run: |
-          echo "download_url=https://github.com/${{ github.repository }}/releases/download/build-${{ github.run_number }}/app-release.apk" >> $GITHUB_OUTPUT
+          echo "download_url=https://github.com/${{ github.repository }}/releases/download/build-${{ github.run_number }}/${{ env.APK_NAME }}" >> $GITHUB_OUTPUT
 
   appvault:
     runs-on: ubuntu-latest
@@ -145,13 +148,19 @@ jobs:
           except:
               apps = []
 
-          app_id = os.environ["APP_ID"]
-          stars = int(os.environ["STARS"])
-          downloads = int(os.environ["DOWNLOADS"])
-          sha = os.environ["GITHUB_SHA"][:7]
-          repo = os.environ["GITHUB_REPOSITORY"]
-          today = datetime.date.today().isoformat()
-          download_url = os.environ["DOWNLOAD_URL"]
+          app_id     = os.environ["APP_ID"]
+          apk_name   = os.environ["APK_NAME"]
+          stars      = int(os.environ["STARS"])
+          downloads  = int(os.environ["DOWNLOADS"])
+          sha        = os.environ["GITHUB_SHA"][:7]
+          repo       = os.environ["GITHUB_REPOSITORY"]
+          run_number = os.environ["GITHUB_RUN_NUMBER"]
+          today      = datetime.date.today().isoformat()
+
+          download_url = (
+              f"https://github.com/{repo}/releases/download/"
+              f"build-{run_number}/{apk_name}"
+          )
 
           entry = {
               "id": app_id,
@@ -167,7 +176,6 @@ jobs:
           }
 
           existing = next((a for a in apps if a["id"] == app_id), None)
-
           if existing:
               existing.update(entry)
           else:
@@ -176,13 +184,14 @@ jobs:
           with open(JSON_PATH, "w") as f:
               json.dump(apps, f, indent=2)
 
-          print("Updated apps.json")
+          print(f"Updated apps.json → {download_url}")
           PYEOF
         env:
           APP_ID: ${{ env.APP_ID }}
+          APK_NAME: ${{ env.APK_NAME }}
           STARS: ${{ steps.stats.outputs.stars }}
           DOWNLOADS: ${{ steps.stats.outputs.downloads }}
-          DOWNLOAD_URL: https://github.com/${{ github.repository }}/releases/download/build-${{ github.run_number }}/app-release.apk
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
 
       - name: Publish to AppVault
         run: |
