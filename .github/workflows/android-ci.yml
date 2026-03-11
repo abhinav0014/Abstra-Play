@@ -47,7 +47,7 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
 
       - name: Create GitHub Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
         id: release
         uses: softprops/action-gh-release@v2
         with:
@@ -58,7 +58,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Convert app icon to PNG
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
         run: |
           sudo apt-get install -y inkscape 2>/dev/null || true
 
@@ -91,7 +91,7 @@ jobs:
           ls -lh "$ICON_OUT"
 
       - name: Fetch repo stats
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
         id: stats
         run: |
           REPO="${{ github.repository }}"
@@ -132,7 +132,7 @@ jobs:
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
 
       - name: Read app-metadata.json
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
         id: appmeta
         run: |
           if [ -f "app-metadata.json" ]; then
@@ -142,7 +142,7 @@ jobs:
           fi
 
       - name: Checkout AppVault repo
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
         uses: actions/checkout@v4
         with:
           repository: ${{ env.APPVAULT_REPO }}
@@ -150,7 +150,7 @@ jobs:
           path: appvault
 
       - name: Copy icon to AppVault
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
         run: |
           mkdir -p appvault/icons
           if [ -f "icon.png" ]; then
@@ -158,7 +158,7 @@ jobs:
           fi
 
       - name: Update apps.json
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
         run: |
           cd appvault
 
@@ -230,7 +230,7 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
 
       - name: Publish to AppVault
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/production'
         run: |
           cd appvault
           git config user.name  "github-actions[bot]"
