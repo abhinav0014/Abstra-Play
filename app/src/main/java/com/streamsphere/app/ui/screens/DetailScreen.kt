@@ -791,19 +791,29 @@ private fun FullscreenPlayer(
             .fillMaxSize()
             .background(Color.Black)
             .pointerInput(isLocked) {
-                if (!isLocked) {
-                    detectVerticalDragGestures { change, dragAmount ->
-                        val delta  = -dragAmount / size.height.toFloat()
-                        val isLeft = change.position.x < size.width / 2f
-                        if (isLeft) { val b = (brightnessLevel + delta).coerceIn(0.01f, 1f); brightnessLevel = b; applyBrightness(b) }
-                        else        { val v = (volumeLevel + delta).coerceAtLeast(0.05f).coerceAtMost(1f); volumeLevel = v; applyVolume(v) }
-                        showControls = true
-                    }
-                }
+            if (!isLocked) {
+            detectVerticalDragGestures { change, dragAmount ->
+            val delta  = -dragAmount / size.height.toFloat()
+            val isLeft = change.position.x < size.width / 2f
+            if (isLeft) {
+                val b = (brightnessLevel + delta).coerceIn(0.01f, 1f)
+                brightnessLevel = b
+                applyBrightness(b)
+            } else {
+                val v = (volumeLevel + delta).coerceAtLeast(0.05f).coerceAtMost(1f)
+                volumeLevel = v
+                applyVolume(v)
             }
+
+            showControls = true
+        }
+    }
+}
             .pointerInput(Unit) {
-                awaitPointerEventScope { while (true) { awaitPointerEvent(); showControls = !showControls } }
-            }
+              detectTapGestures(
+                onTap = { showControls = !showControls }
+              )
+}
     ) {
         if (exoPlayer != null) {
             AndroidView(
