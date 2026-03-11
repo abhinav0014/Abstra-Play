@@ -29,29 +29,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_CHANNEL_ID  = "extra_channel_id"
         const val EXTRA_STREAM_URL  = "extra_stream_url"
-        const val EXTRA_FULLSCREEN  = "extra_fullscreen"
-    }
-
-      // ← ADD THIS LINE
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-
-        val startChannelId  = intent?.getStringExtra(EXTRA_CHANNEL_ID)
-        val startFullscreen = intent?.getBooleanExtra(EXTRA_FULLSCREEN, false) ?: false
-
-        
-    }
-}
-
-@AndroidEntryPoint
-class MainActivity : ComponentActivity() {
-
-    companion object {
-        const val EXTRA_CHANNEL_ID  = "extra_channel_id"
-        const val EXTRA_STREAM_URL  = "extra_stream_url"
         const val EXTRA_FULLSCREEN  = "extra_fullscreen"  // from widget tap
     }
     
