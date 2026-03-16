@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.streamsphere.app.data.dlna.DlnaBrowseItem
+import com.streamsphere.app.data.dlna.DlnaBrowseItemType
 import com.streamsphere.app.data.dlna.DlnaDevice
 import com.streamsphere.app.data.dlna.DlnaDeviceType
 import com.streamsphere.app.viewmodel.DlnaViewModel
@@ -167,15 +168,18 @@ private fun DlnaDeviceCard(
 
 @Composable
 private fun BrowseItemRow(item: DlnaBrowseItem) {
-    when (item) {
-        is DlnaBrowseItem.Container -> ListItem(
+    when (item.type) {
+        DlnaBrowseItemType.CONTAINER -> ListItem(
             headlineContent = { Text(item.title) },
-            supportingContent = { Text("${item.childCount} items") },
+            supportingContent = { Text("${item.childCount ?: 0} items") },
             leadingContent = { Icon(Icons.Default.Folder, null) }
         )
-        is DlnaBrowseItem.Track -> ListItem(
+        DlnaBrowseItemType.VIDEO,
+        DlnaBrowseItemType.AUDIO,
+        DlnaBrowseItemType.IMAGE,
+        DlnaBrowseItemType.OTHER -> ListItem(
             headlineContent = { Text(item.title) },
-            supportingContent = { Text(item.mimeType) },
+            supportingContent = { Text(item.mimeType ?: "") },
             leadingContent = { Icon(Icons.Default.MusicNote, null) }
         )
     }
