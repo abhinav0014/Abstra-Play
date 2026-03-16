@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: [ "production" ]
+    branches: [ "main" ]
 
 permissions:
   contents: write
@@ -84,12 +84,18 @@ jobs:
     needs: release
 
     steps:
+      - name: Checkout source repo (for app-manifest.json)
+        uses: actions/checkout@v4
+        with:
+          path: source
+
       - name: Checkout AppVault repo
         uses: actions/checkout@v4
         with:
-          repository: ${{ env.APPVAULT_REPO }}
+          repository: abster07/app-vault
           token: ${{ secrets.GITHUB_TOKEN }}
           path: appvault
+          persist-credentials: false
 
       - name: Fetch repo stats
         id: stats
@@ -121,16 +127,9 @@ jobs:
           echo "stars=$STARS" >> $GITHUB_OUTPUT
           echo "downloads=$DOWNLOADS" >> $GITHUB_OUTPUT
 
-      - name: Generate icon
+      - name: Use existing icon
         run: |
-          sudo apt-get update
-          sudo apt-get install -y imagemagick
-          convert -size 256x256 xc:"#6d28d9" icon.png
-
-      - name: Copy icon to AppVault
-        run: |
-          mkdir -p appvault/icons
-          cp icon.png appvault/icons/${{ env.APP_ID }}.png
+          cp source/app/src/main/res/ic_launcher-web.png appvault/icons/${{ env.APP_ID }}.png
 
       - name: Update apps.json
         run: |
@@ -140,12 +139,21 @@ jobs:
           import json, os, datetime
 
           JSON_PATH = "apps.json"
+          MANIFEST_PATH = "../source/app-manifest.json"
 
+          # Load existing apps.json
           try:
               with open(JSON_PATH) as f:
                   apps = json.load(f)
-          except:
+          except Exception:
               apps = []
+
+          # Load app-manifest.json from the source repo
+          try:
+              with open(MANIFEST_PATH) as f:
+                  manifest = json.load(f)
+          except Exception:
+              manifest = {}
 
           app_id     = os.environ["APP_ID"]
           apk_name   = os.environ["APK_NAME"]
@@ -162,16 +170,20 @@ jobs:
           )
 
           entry = {
-              "id": app_id,
-              "name": app_id.replace("-", " ").title(),
-              "version": sha,
-              "description": "Android app",
-              "iconUrl": f"icons/{app_id}.png",
+              "id":          app_id,
+              # Prefer display name from manifest, fall back to slug
+              "name":        manifest.get("name", app_id.replace("-", " ").title()),
+              "version":     manifest.get("version", sha),
+              "description": manifest.get("description", "Android app"),
+              "iconUrl":     f"icons/{app_id}.png",
+              "iconBg":      manifest.get("iconBg", ""),
+              "tags":        manifest.get("tags", []),
+              "platforms":   manifest.get("platforms", ["android"]),
               "downloadUrl": download_url,
-              "downloads": downloads,
-              "stars": stars,
-              "updated": today,
-              "commit": sha
+              "downloads":   downloads,
+              "stars":       stars,
+              "updated":     today,
+              "commit":      sha
           }
 
           existing = next((a for a in apps if a["id"] == app_id), None)
@@ -199,4 +211,6 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add apps.json icons/
           git commit -m "chore(${{ env.APP_ID }}): update from ${{ github.repository }}@${{ github.sha }}" || exit 0
-          git push
+          git push https://$PAT_TOKEN@github.com/abster07/app-vault.git
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_CLASSIC }}
