@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class DlnaCastState(
@@ -32,11 +31,11 @@ class DlnaViewModel @Inject constructor(
     val isBound: StateFlow<Boolean> = dlnaRepository.isBound
 
     val renderers: StateFlow<List<DlnaDevice>> = dlnaRepository.devices
-        .map { it.filter { d -> d.type == DlnaDeviceType.RENDERER } }
+        .map { list -> list.filter { d -> d.type == DlnaDeviceType.RENDERER } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val mediaServers: StateFlow<List<DlnaDevice>> = dlnaRepository.devices
-        .map { it.filter { d -> d.type == DlnaDeviceType.MEDIA_SERVER } }
+        .map { list -> list.filter { d -> d.type == DlnaDeviceType.MEDIA_SERVER } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _castState = MutableStateFlow(DlnaCastState())
@@ -50,10 +49,6 @@ class DlnaViewModel @Inject constructor(
 
     // ── Casting ────────────────────────────────────────────────────────────
 
-    /**
-     * Cast a channel's stream URL to the selected DLNA renderer.
-     * Call this from DetailScreen when user picks a renderer.
-     */
     fun castToRenderer(device: DlnaDevice, streamUrl: String, channelName: String) {
         val cp = dlnaRepository.getControlPoint() ?: run {
             _castState.value = _castState.value.copy(errorMessage = "UPnP service not ready")
@@ -72,7 +67,7 @@ class DlnaViewModel @Inject constructor(
             onSuccess = {
                 _castState.value = _castState.value.copy(errorMessage = null)
             },
-            onFailure = { msg ->
+            onFailure = { msg: String? ->
                 _castState.value = DlnaCastState(errorMessage = msg ?: "Cast failed")
             }
         )
@@ -84,7 +79,8 @@ class DlnaViewModel @Inject constructor(
         val remoteDevice = dlnaRepository.getRemoteDevice(castingDevice.udn) ?: return
 
         DlnaRendererController(cp, remoteDevice).stop(
-            onSuccess = { _castState.value = DlnaCastState() }
+            onSuccess = { _castState.value = DlnaCastState() },
+            onFailure = { _: String? -> _castState.value = DlnaCastState() }
         )
     }
 
@@ -104,11 +100,11 @@ class DlnaViewModel @Inject constructor(
         DlnaBrowserRepository(cp).browse(
             device = remoteDevice,
             containerId = containerId,
-            onResult = { items ->
+            onResult = { items: List<DlnaBrowseItem> ->
                 _browseItems.value = items
                 _isBrowseLoading.value = false
             },
-            onError = { msg ->
+            onError = { msg: String? ->
                 _browseItems.value = emptyList()
                 _isBrowseLoading.value = false
                 _castState.value = _castState.value.copy(errorMessage = msg)
@@ -118,12 +114,8 @@ class DlnaViewModel @Inject constructor(
 
     // ── Discovery & Lifecycle ──────────────────────────────────────────────
 
-    /** Call from a DisposableEffect in the screen that owns the cast session. */
     fun bind() = dlnaRepository.bind()
-
-    /** Call from the onDispose of the same DisposableEffect. */
     fun unbind() = dlnaRepository.unbind()
-
     fun refresh() = dlnaRepository.search()
 
     fun clearError() {

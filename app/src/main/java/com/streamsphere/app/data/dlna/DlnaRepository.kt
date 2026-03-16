@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.jupnp.android.AndroidUpnpService
 import org.jupnp.android.AndroidUpnpServiceImpl
+import org.jupnp.controlpoint.ControlPoint
 import org.jupnp.model.meta.RemoteDevice
 import org.jupnp.registry.DefaultRegistryListener
 import org.jupnp.registry.Registry
@@ -50,10 +51,10 @@ class DlnaRepository @Inject constructor(
     }
 
     private val serviceConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName, service: IBinder) {
+        override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             Log.d(TAG, "UPnP service connected")
-            val binder = service as AndroidUpnpService.LocalBinder
-            upnpService = binder.service
+            // The binder returned by AndroidUpnpServiceImpl directly implements AndroidUpnpService
+            upnpService = binder as AndroidUpnpService
             upnpService?.registry?.addListener(registryListener)
             upnpService?.controlPoint?.search()
             _isBound.value = true
@@ -89,7 +90,7 @@ class DlnaRepository @Inject constructor(
         upnpService?.controlPoint?.search()
     }
 
-    fun getControlPoint() = upnpService?.controlPoint
+    fun getControlPoint(): ControlPoint? = upnpService?.controlPoint
 
     fun getRemoteDevice(udn: String): RemoteDevice? {
         return upnpService?.registry?.devices
@@ -100,8 +101,6 @@ class DlnaRepository @Inject constructor(
     private fun refreshDevices(registry: Registry) {
         _devices.value = registry.devices
             .filterIsInstance<RemoteDevice>()
-            .mapNotNull { device ->
-                runCatching { device.toDlnaDevice() }.getOrNull()
-            }
+            .mapNotNull { device -> runCatching { device.toDlnaDevice() }.getOrNull() }
     }
 }
