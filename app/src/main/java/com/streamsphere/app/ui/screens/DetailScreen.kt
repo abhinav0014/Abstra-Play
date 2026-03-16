@@ -167,6 +167,7 @@ private fun DetailContent(
 
     var isPlaying    by remember { mutableStateOf(autoPlay) }
     var playerError  by remember { mutableStateOf<String?>(null) }
+    var isBuffering  by remember { mutableStateOf(false) }
     var audioTracks  by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
 
     val exoPlayer = rememberExoPlayer(context, channel.streamUrl, autoPlay) { err ->
@@ -179,6 +180,9 @@ private fun DetailContent(
         exoPlayer.volume = 1f
         exoPlayer.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
+            override fun onPlaybackStateChanged(state: Int) {
+                isBuffering = state == Player.STATE_BUFFERING
+            }
             override fun onTracksChanged(tracks: Tracks) {
                 audioTracks = extractAudioTracks(tracks)
                 // If somehow no track is selected, force the first one
@@ -234,11 +238,16 @@ private fun DetailContent(
     }
 
     // 2. Thumbnail overlay — only when truly not playing AND no error
-    if (exoPlayer != null && !isPlaying && playerError == null) {
+    if (exoPlayer != null && !isPlaying && !isBuffering && playerError == null) {
         ThumbnailOverlay(channel, catColor) {
             playerError = null
             exoPlayer.playWhenReady = true
         }
+    }
+
+    // 2b. Buffering overlay — shown while stream is loading
+    if (exoPlayer != null && isBuffering && playerError == null) {
+        BufferingOverlay()
     }
 
     // 3. Error overlay — highest priority visual layer
@@ -691,6 +700,7 @@ private fun FullscreenPlayer(
 
     var isPlaying       by remember { mutableStateOf(true) }
     var playerError     by remember { mutableStateOf<String?>(null) }
+    var isBuffering     by remember { mutableStateOf(false) }
     var isLocked        by remember { mutableStateOf(false) }
     var showControls    by remember { mutableStateOf(true) }
     var isRotLocked     by remember { mutableStateOf(false) }
@@ -767,6 +777,9 @@ private fun FullscreenPlayer(
         exoPlayer?.volume = 1f
         exoPlayer?.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
+            override fun onPlaybackStateChanged(state: Int) {
+                isBuffering = state == Player.STATE_BUFFERING
+            }
             override fun onTracksChanged(tracks: Tracks) {
                 audioTracks = extractAudioTracks(tracks)
                 if (audioTracks.isNotEmpty() && audioTracks.none { it.isSelected }) {
@@ -830,6 +843,11 @@ private fun FullscreenPlayer(
         }
 
         EdgeLevelBars(brightnessLevel = brightnessLevel, volumeLevel = volumeLevel)
+
+        // Buffering indicator — shown while stream is loading
+        if (isBuffering && playerError == null) {
+            BufferingOverlay()
+        }
 
         if (isLocked) {
             AnimatedVisibility(visible = showControls, enter = fadeIn(), exit = fadeOut()) {
@@ -1044,13 +1062,35 @@ private fun ThumbnailOverlay(channel: ChannelUiModel, catColor: Color, onPlay: (
 @Composable
 private fun ErrorOverlay(message: String, onRetry: () -> Unit) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(0.75f)), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Filled.ErrorOutline, null, tint = Color(0xFFFC8181), modifier = Modifier.size(36.dp))
-            Spacer(Modifier.height(8.dp))
-            Text(message, style = MaterialTheme.typography.bodySmall, color = Color.White)
-            Spacer(Modifier.height(8.dp))
-            TextButton(onClick = onRetry) { Text("Retry", color = Color.White) }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 24.dp)
+        ) {
+            Icon(Icons.Filled.ErrorOutline, null, tint = Color(0xFFFC8181), modifier = Modifier.size(40.dp))
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text      = message,
+                style     = MaterialTheme.typography.bodyMedium,
+                color     = Color.White,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = onRetry,
+                colors  = ButtonDefaults.buttonColors(containerColor = Color(0xFFFC8181))
+            ) {
+                Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Retry")
+            }
         }
+    }
+}
+
+@Composable
+private fun BufferingOverlay() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp, modifier = Modifier.size(42.dp))
     }
 }
 
@@ -1160,7 +1200,7 @@ private fun rememberExoPlayer(
                 .build()
             addListener(object : Player.Listener {
                 override fun onPlayerError(error: PlaybackException) {
-                    onError(error.message ?: "Playback error")
+                    onError(friendlyPlaybackError(error))
                 }
             })
         }
@@ -1175,6 +1215,27 @@ private fun rememberExoPlayer(
     }
 
     return playerRef.value
+}
+
+private fun friendlyPlaybackError(error: PlaybackException): String {
+    return when (error.errorCode) {
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
+            "No connection — check your internet and try again."
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
+            "Stream unavailable (server returned an error)."
+        PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ->
+            "Stream not found. It may have moved or gone offline."
+        PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED ->
+            "Unsupported stream format."
+        PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+        PlaybackException.ERROR_CODE_DECODING_FAILED ->
+            "Playback failed — codec or decoding error."
+        PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ->
+            "Fell behind the live stream. Retrying…"
+        else -> "Playback error (${error.errorCode}): ${error.message?.take(120) ?: "Unknown error"}"
+    }
 }
 
 private fun categoryColorFor(channel: ChannelUiModel): Color = when {
