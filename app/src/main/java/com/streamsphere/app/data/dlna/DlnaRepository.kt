@@ -52,7 +52,8 @@ class DlnaRepository @Inject constructor(
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
             Log.d(TAG, "UPnP service connected")
-            upnpService = (service as AndroidUpnpService.LocalBinder).service
+            val binder = service as AndroidUpnpService.LocalBinder
+            upnpService = binder.service
             upnpService?.registry?.addListener(registryListener)
             upnpService?.controlPoint?.search()
             _isBound.value = true
