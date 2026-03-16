@@ -1,16 +1,15 @@
 package com.streamsphere.app.data.dlna
 
-import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
-import android.content.ServiceConnection
-import android.os.IBinder
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.jupnp.android.AndroidUpnpService
-import org.jupnp.android.AndroidUpnpServiceImpl
+import kotlinx.coroutines.launch
+import org.jupnp.UpnpService
+import org.jupnp.UpnpServiceImpl
 import org.jupnp.controlpoint.ControlPoint
 import org.jupnp.model.meta.RemoteDevice
 import org.jupnp.registry.DefaultRegistryListener
@@ -19,14 +18,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class DlnaRepository @Inject constructor(
-    private val context: Context
-) {
+class DlnaRepository @Inject constructor() {
+
     companion object {
         private const val TAG = "DlnaRepository"
     }
 
-    private var upnpService: AndroidUpnpService? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private var upnpService: UpnpService? = null
 
     private val _devices = MutableStateFlow<List<DlnaDevice>>(emptyList())
     val devices: StateFlow<List<DlnaDevice>> = _devices.asStateFlow()
@@ -50,40 +50,30 @@ class DlnaRepository @Inject constructor(
         }
     }
 
-    private val serviceConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName, binder: IBinder) {
-            Log.d(TAG, "UPnP service connected")
-            // The binder returned by AndroidUpnpServiceImpl directly implements AndroidUpnpService
-            upnpService = binder as AndroidUpnpService
-            upnpService?.registry?.addListener(registryListener)
-            upnpService?.controlPoint?.search()
-            _isBound.value = true
-        }
-
-        override fun onServiceDisconnected(name: ComponentName) {
-            Log.d(TAG, "UPnP service disconnected")
-            upnpService = null
-            _isBound.value = false
-        }
-    }
-
     fun bind() {
-        context.bindService(
-            Intent(context, AndroidUpnpServiceImpl::class.java),
-            serviceConnection,
-            Context.BIND_AUTO_CREATE
-        )
+        if (_isBound.value) return
+        scope.launch {
+            try {
+                val svc = UpnpServiceImpl()
+                svc.startup()
+                upnpService = svc
+                svc.registry.addListener(registryListener)
+                svc.controlPoint.search()
+                _isBound.value = true
+                Log.d(TAG, "UPnP service started")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start UPnP service", e)
+            }
+        }
     }
 
     fun unbind() {
         upnpService?.registry?.removeListener(registryListener)
-        try {
-            context.unbindService(serviceConnection)
-        } catch (e: IllegalArgumentException) {
-            Log.w(TAG, "Service was not bound: ${e.message}")
-        }
+        upnpService?.shutdown()
         upnpService = null
         _isBound.value = false
+        _devices.value = emptyList()
+        Log.d(TAG, "UPnP service stopped")
     }
 
     fun search() {

@@ -144,9 +144,12 @@ class DlnaRendererController(
         }
 
         controlPoint.execute(object : ActionCallback(invocation) {
-            override fun success(invocation: ActionInvocation<*>) = Log.d(TAG, "SetVolume success")
-            override fun failure(invocation: ActionInvocation<*>, operation: UpnpResponse?, defaultMsg: String?) =
+            override fun success(invocation: ActionInvocation<*>) {
+                Log.d(TAG, "SetVolume success")
+            }
+            override fun failure(invocation: ActionInvocation<*>, operation: UpnpResponse?, defaultMsg: String?) {
                 Log.e(TAG, "SetVolume failed: $defaultMsg")
+            }
         })
     }
 
