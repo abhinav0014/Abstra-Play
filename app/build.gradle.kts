@@ -116,7 +116,7 @@ dependencies {
 
     // DLNA / UPnP
     implementation("org.jupnp:org.jupnp:2.7.1")
-    implementation("org.jupnp:org.jupnp.android:2.7.1")   // Android-specific binding
+    implementation("org.jupnp:org.jupnp.android:3.0.0")   // Android-specific binding
     implementation("org.slf4j:slf4j-android:1.7.36")
 
     // ── Google Cast SDK ────────────────────────────────────────────────────
