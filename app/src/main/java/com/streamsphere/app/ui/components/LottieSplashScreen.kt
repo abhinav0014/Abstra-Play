@@ -19,7 +19,7 @@ import com.streamsphere.app.R
  * Once the animation finishes, it triggers [onFinished] to navigate to the main app.
  */
 @Composable
-fun LottieSplashScreenComponent(onFinished: () -> Unit) {
+fun LottieSplashScreen(onFinished: () -> Unit) {
     // 1. Load the composition from your res/raw/streamsphere.json
     val composition by rememberLottieComposition(
         LottieCompositionSpec.RawRes(R.raw.streamsphere) 
