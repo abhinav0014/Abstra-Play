@@ -28,6 +28,7 @@ import com.streamsphere.app.ui.theme.StreamSphereTheme
 import com.streamsphere.app.viewmodel.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import com.streamsphere.app.ui.components.LottieSplashScreen
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
