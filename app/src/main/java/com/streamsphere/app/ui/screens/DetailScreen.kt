@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -50,7 +51,7 @@ import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
-import com.streamsphere.app.data.cast.ChromecastState          // ← NEW
+import com.streamsphere.app.data.cast.ChromecastState
 import com.streamsphere.app.data.dlna.DlnaDevice
 import com.streamsphere.app.data.dlna.DlnaDeviceType
 import com.streamsphere.app.data.model.ChannelUiModel
@@ -105,10 +106,8 @@ fun DetailScreen(
     val renderers        by dlnaViewModel.renderers.collectAsState()
     val castState        by dlnaViewModel.castState.collectAsState()
     val isBound          by dlnaViewModel.isBound.collectAsState()
-    // ↓ NEW — collect Chromecast state
     val chromecastState  by dlnaViewModel.chromecastState.collectAsState()
 
-    // Snackbar for cast errors — watches both DLNA and Chromecast errors
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(castState.errorMessage) {
         castState.errorMessage?.let { msg ->
@@ -116,7 +115,6 @@ fun DetailScreen(
             dlnaViewModel.clearError()
         }
     }
-    // ↓ NEW — also surface Chromecast errors through the same snackbar
     LaunchedEffect(chromecastState.errorMessage) {
         chromecastState.errorMessage?.let { msg ->
             snackbarHostState.showSnackbar(msg)
@@ -124,7 +122,6 @@ fun DetailScreen(
         }
     }
 
-    // Combined "is anything casting right now" flag used for the top-bar icon
     val isAnyCasting = castState.isCasting || chromecastState.isCasting
 
     if (isFullscreen) {
@@ -132,8 +129,6 @@ fun DetailScreen(
             FullscreenPlayer(
                 channel          = ch,
                 onExitFullscreen = { isFullscreen = false },
-                onFavourite      = { viewModel.toggleFavourite(ch) },
-                onWidget         = { viewModel.toggleWidget(ch) },
                 onSelectStream   = { idx -> viewModel.selectStream(ch.id, idx) },
                 dlnaViewModel    = dlnaViewModel
             )
@@ -146,12 +141,11 @@ fun DetailScreen(
                     title = { Text(channel?.name ?: "Channel") },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Filled.ArrowBack, "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                         }
                     },
                     actions = {
                         channel?.let { ch ->
-                            // Top-bar cast icon — status indicator only, no action
                             IconButton(onClick = {}) {
                                 Icon(
                                     imageVector        = if (isAnyCasting) Icons.Filled.CastConnected else Icons.Filled.Cast,
@@ -188,18 +182,18 @@ fun DetailScreen(
                     renderers         = renderers,
                     isBound           = isBound,
                     castState         = castState,
-                    chromecastState   = chromecastState,                  // ← NEW
+                    chromecastState   = chromecastState,
                     onCastToDevice    = { device ->
                         dlnaViewModel.castToRenderer(device, channel.streamUrl ?: "", channel.name)
                     },
-                    onCastToChromecast = {                                // ← NEW
+                    onCastToChromecast = {
                         dlnaViewModel.castToChromecast(
                             channel.streamUrl ?: "", channel.name, channel.logoUrl
                         )
                     },
                     onStopCast        = {
                         dlnaViewModel.stopCast()
-                        dlnaViewModel.stopChromecast()                    // ← NEW stop both
+                        dlnaViewModel.stopChromecast()
                     },
                     onRefreshDlna     = { dlnaViewModel.refresh() },
                     modifier          = Modifier.padding(padding)
@@ -224,9 +218,9 @@ private fun DetailContent(
     renderers: List<DlnaDevice>,
     isBound: Boolean,
     castState: DlnaCastState,
-    chromecastState: ChromecastState,                                     // ← NEW param
+    chromecastState: ChromecastState,
     onCastToDevice: (DlnaDevice) -> Unit,
-    onCastToChromecast: () -> Unit,                                       // ← NEW param
+    onCastToChromecast: () -> Unit,
     onStopCast: () -> Unit,
     onRefreshDlna: () -> Unit,
     modifier: Modifier = Modifier
@@ -244,10 +238,8 @@ private fun DetailContent(
     var showAudioPicker by remember { mutableStateOf(false) }
     var showCastPicker  by remember { mutableStateOf(false) }
 
-    // True if either cast technology is active
     val isAnyCasting = castState.isCasting || chromecastState.isCasting
 
-    // The friendly name to show in the banner — prefer Chromecast device name
     val castingDeviceName = chromecastState.deviceName
         ?: castState.castingToDevice?.friendlyName
         ?: "device"
@@ -360,7 +352,6 @@ private fun DetailContent(
                                 tint = Color.White, modifier = Modifier.size(28.dp))
                         }
 
-                        // Cast button in player overlay
                         IconButton(
                             onClick  = {
                                 lastInteraction = System.currentTimeMillis()
@@ -434,7 +425,6 @@ private fun DetailContent(
                 }
             }
 
-            // Cast button — label reflects which technology is active
             OutlinedButton(
                 onClick  = { if (isAnyCasting) onStopCast() else showCastPicker = true },
                 modifier = Modifier.fillMaxWidth(),
@@ -486,7 +476,6 @@ private fun DetailContent(
         )
     }
 
-    // ↓ CHANGED — DlnaDevicePickerSheet replaced with CastDevicePickerSheet
     if (showCastPicker) {
         CastDevicePickerSheet(
             dlnaRenderers        = renderers,
@@ -711,8 +700,6 @@ private fun FeedPickerSheet(channel: ChannelUiModel, catColor: Color, onSelect: 
 private fun FullscreenPlayer(
     channel: ChannelUiModel,
     onExitFullscreen: () -> Unit,
-    onFavourite: () -> Unit,
-    onWidget: () -> Unit,
     onSelectStream: (Int) -> Unit,
     dlnaViewModel: DlnaViewModel
 ) {
@@ -738,7 +725,7 @@ private fun FullscreenPlayer(
     val renderers       by dlnaViewModel.renderers.collectAsState()
     val castState       by dlnaViewModel.castState.collectAsState()
     val isBound         by dlnaViewModel.isBound.collectAsState()
-    val chromecastState by dlnaViewModel.chromecastState.collectAsState()   // ← NEW
+    val chromecastState by dlnaViewModel.chromecastState.collectAsState()
 
     val isAnyCasting      = castState.isCasting || chromecastState.isCasting
     val castingDeviceName = chromecastState.deviceName ?: castState.castingToDevice?.friendlyName ?: "device"
@@ -886,8 +873,7 @@ private fun FullscreenPlayer(
                     catColor          = catColor,
                     isRotLocked       = isRotLocked,
                     audioTracks       = audioTracks,
-                    castState         = castState,
-                    isAnyCasting      = isAnyCasting,                     // ← NEW
+                    isAnyCasting      = isAnyCasting,
                     onPlayPause       = { if (isPlaying) exoPlayer?.pause() else exoPlayer?.play() },
                     onReplay          = { exoPlayer?.seekBack() },
                     onForward         = { exoPlayer?.seekForward() },
@@ -942,7 +928,6 @@ private fun FullscreenPlayer(
         )
     }
 
-    // ↓ CHANGED — CastDevicePickerSheet instead of DlnaDevicePickerSheet
     if (showCastPicker) {
         CastDevicePickerSheet(
             dlnaRenderers        = renderers,
@@ -974,8 +959,7 @@ private fun FullscreenControls(
     catColor: Color,
     isRotLocked: Boolean,
     audioTracks: List<AudioTrack>,
-    castState: DlnaCastState,
-    isAnyCasting: Boolean,                                                // ← NEW param
+    isAnyCasting: Boolean,
     onPlayPause: () -> Unit,
     onReplay: () -> Unit,
     onForward: () -> Unit,
@@ -1023,7 +1007,6 @@ private fun FullscreenControls(
                     Icon(Icons.Filled.Subtitles, "Change Feed", tint = catColor)
                 }
             }
-            // Cast button — uses isAnyCasting instead of just castState.isCasting
             IconButton(onClick = onOpenCastPicker) {
                 Icon(
                     imageVector        = if (isAnyCasting) Icons.Filled.CastConnected else Icons.Filled.Cast,
@@ -1125,7 +1108,7 @@ private fun BufferingOverlay() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ExoPlayer helpers — unchanged
+// ExoPlayer helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -1171,7 +1154,7 @@ fun rememberExoPlayer(
     context: Context,
     streamUrl: String?,
     autoPlay: Boolean,
-    onError: (String) -> Unit
+    @Suppress("UNUSED_PARAMETER") onError: (String) -> Unit
 ): ExoPlayer? {
     if (streamUrl.isNullOrBlank()) return null
 
@@ -1182,17 +1165,16 @@ fun rememberExoPlayer(
                 val dataSourceFactory = DefaultHttpDataSource.Factory()
                     .setUserAgent("StreamSphere/1.0")
                     .setAllowCrossProtocolRedirects(true)
-                
+
                 val mediaSource = HlsMediaSource.Factory(dataSourceFactory)
                     .createMediaSource(MediaItem.fromUri(Uri.parse(streamUrl)))
-                
+
                 setMediaSource(mediaSource)
                 prepare()
                 playWhenReady = autoPlay
             }
     }
 
-    // CRITICAL: Release player when the Composable is destroyed
     DisposableEffect(exoPlayer) {
         onDispose {
             exoPlayer.release()
@@ -1202,6 +1184,7 @@ fun rememberExoPlayer(
     return exoPlayer
 }
 
+@Suppress("UNUSED_PARAMETER")
 private fun friendlyPlaybackError(error: PlaybackException): String = when (error.errorCode) {
     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "No connection — check your internet and try again."

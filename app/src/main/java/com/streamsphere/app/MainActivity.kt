@@ -15,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.mediarouter.app.MediaRouteButton
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
@@ -36,8 +35,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_CHANNEL_ID  = "extra_channel_id"
         const val EXTRA_STREAM_URL  = "extra_stream_url"
-        const val EXTRA_FULLSCREEN  = "extra_fullscreen"  
-
+        const val EXTRA_FULLSCREEN  = "extra_fullscreen"
     }
 
     private val settingsViewModel: SettingsViewModel by viewModels()
@@ -45,12 +43,10 @@ class MainActivity : ComponentActivity() {
     private var castContext: CastContext? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 1. Install System Splash (Standard Icon)
-        val splashScreen = installSplashScreen()
+        installSplashScreen()   // install but don't hold a reference — not needed
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // 2. Initialise Cast
         castContext = try {
             CastContext.getSharedInstance(this)
         } catch (e: Exception) {
@@ -60,21 +56,17 @@ class MainActivity : ComponentActivity() {
         val startChannelId  = intent?.getStringExtra(EXTRA_CHANNEL_ID)
         val startFullscreen = intent?.getBooleanExtra(EXTRA_FULLSCREEN, false) ?: false
 
-        // 3. SINGLE setContent call
         setContent {
             val darkMode by settingsViewModel.darkMode.collectAsState()
-            
-            // Logic to handle the transition from Lottie to Main UI
+
             var showLottieSplash by remember { mutableStateOf(true) }
 
             StreamSphereTheme(darkTheme = darkMode) {
                 if (showLottieSplash) {
-                    // Your custom Lottie animation screen
                     LottieSplashScreen(onFinished = {
                         showLottieSplash = false
                     })
                 } else {
-                    // Your actual App content
                     StreamSphereUI(
                         startChannelId = startChannelId,
                         startFullscreen = startFullscreen

@@ -1,8 +1,6 @@
 package com.streamsphere.app
 
 import android.content.Context
-import androidx.room.Room
-import com.streamsphere.app.data.api.AppDatabase
 import com.streamsphere.app.data.api.IptvApi
 import com.streamsphere.app.data.preferences.SettingsDataStore
 import dagger.Module
@@ -44,12 +42,7 @@ object AppModule {
     fun provideSettingsDataStore(@ApplicationContext ctx: Context): SettingsDataStore =
         SettingsDataStore(ctx)
 
-    @Provides @Singleton
-    fun provideDatabase(@ApplicationContext ctx: Context): AppDatabase =
-        Room.databaseBuilder(ctx, AppDatabase::class.java, "streamsphere.db")
-            .fallbackToDestructiveMigration()
-            .build()
-
+    // AppDatabase is provided by DatabaseModule — do NOT duplicate it here.
     // CastRepository and DlnaRepository both have @Inject constructors with
     // @ApplicationContext — Hilt resolves them automatically, no @Provides needed.
 }

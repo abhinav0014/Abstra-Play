@@ -20,7 +20,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 data class ChromecastState(
-    val isAvailable: Boolean = false,   // at least one Cast device visible
+    val isAvailable: Boolean = false,
     val isCasting: Boolean = false,
     val deviceName: String? = null,
     val errorMessage: String? = null
@@ -39,7 +39,6 @@ class CastRepository @Inject constructor(
     private val _state = MutableStateFlow(ChromecastState())
     val state: StateFlow<ChromecastState> = _state.asStateFlow()
 
-    // Lazily resolved — CastContext requires a UI thread call and Play Services.
     private val castContext: CastContext? by lazy {
         try {
             CastContext.getSharedInstance(context)
@@ -86,7 +85,6 @@ class CastRepository @Inject constructor(
         override fun onSessionResuming(session: CastSession, sessionId: String) {}
     }
 
-    /** Register the session listener. Call from Activity.onResume(). */
     fun registerSessionListener() {
         scope.launch {
             castContext?.sessionManager?.addSessionManagerListener(
@@ -96,7 +94,6 @@ class CastRepository @Inject constructor(
         }
     }
 
-    /** Unregister the session listener. Call from Activity.onPause(). */
     fun unregisterSessionListener() {
         scope.launch {
             castContext?.sessionManager?.removeSessionManagerListener(
@@ -107,9 +104,9 @@ class CastRepository @Inject constructor(
 
     /**
      * Load [streamUrl] on the currently connected Chromecast.
-     * Returns true if the load request was dispatched successfully.
+     * [logoUrl] is reserved for future artwork support and intentionally unused for now.
      */
-    fun loadMedia(streamUrl: String, title: String, logoUrl: String?): Boolean {
+    fun loadMedia(streamUrl: String, title: String, @Suppress("UNUSED_PARAMETER") logoUrl: String?): Boolean {
         val session = castContext?.sessionManager?.currentCastSession ?: run {
             Log.w(TAG, "No active Cast session")
             _state.value = _state.value.copy(errorMessage = "No active Chromecast session.")
@@ -125,7 +122,6 @@ class CastRepository @Inject constructor(
             putString(MediaMetadata.KEY_TITLE, title)
         }
 
-        // Determine stream MIME type heuristically.
         val mimeType = when {
             streamUrl.contains(".m3u8", ignoreCase = true) -> "application/x-mpegURL"
             streamUrl.contains(".mpd",  ignoreCase = true) -> "application/dash+xml"
@@ -161,7 +157,6 @@ class CastRepository @Inject constructor(
         return true
     }
 
-    /** Stop playback on the active Cast session. */
     fun stopCast() {
         val session = castContext?.sessionManager?.currentCastSession ?: return
         session.remoteMediaClient?.stop()
@@ -169,7 +164,6 @@ class CastRepository @Inject constructor(
         _state.value = _state.value.copy(isCasting = false, deviceName = null)
     }
 
-    /** True when there is an active, connected CastSession. */
     val isConnected: Boolean
         get() = castContext?.sessionManager?.currentCastSession?.isConnected == true
 
@@ -178,8 +172,6 @@ class CastRepository @Inject constructor(
     }
 
     private fun updateAvailability() {
-        // Availability is managed by the MediaRouter framework; here we just
-        // sync the current session state at startup.
         val session = castContext?.sessionManager?.currentCastSession
         if (session?.isConnected == true) {
             _state.value = _state.value.copy(
