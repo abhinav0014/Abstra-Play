@@ -10,6 +10,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.streamsphere.app.viewmodel.DlnaCastState
 
+/**
+ * Cast button shown inside the player overlay (both portrait and fullscreen).
+ *
+ * Displays a filled "cast connected" icon in the theme primary colour whenever
+ * either a DLNA or Chromecast session is active.  Falls back to a plain white
+ * cast icon otherwise.
+ */
 @Composable
 fun DlnaCastButton(
     castState: DlnaCastState,
