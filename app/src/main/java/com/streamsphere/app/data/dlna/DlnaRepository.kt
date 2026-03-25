@@ -22,7 +22,6 @@ import org.jupnp.registry.DefaultRegistryListener
 import org.jupnp.registry.Registry
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.delay
 
 @Singleton
 class DlnaRepository @Inject constructor(
@@ -98,7 +97,6 @@ class DlnaRepository @Inject constructor(
 
     fun bind() {
         if (_isBound.value) return
-        delay(500)
         context.bindService(
             Intent(context, AndroidUpnpServiceImpl::class.java),
             serviceConnection,
