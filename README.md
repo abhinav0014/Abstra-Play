@@ -1,4 +1,4 @@
-# 📺 StreamSphere — Android App
+# StreamSphere — Android App
 
 A beautiful, lightweight Android TV channel browser built with **Kotlin + Jetpack Compose + Material Design 3**.
 
