@@ -54,17 +54,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/channel_widget_info" />
         </receiver>
-
-        <!-- ── jUPnP / DLNA background service ───────────────────────────── -->
-        <service
-            android:name="org.jupnp.android.AndroidUpnpServiceImpl"
-            android:exported="false" />
-
-        <service android:name="androidx.room.MultiInstanceInvalidationService"
-        android:enabled="false"
-        android:exported="false" />
-
-
     </application>
 
 </manifest>
