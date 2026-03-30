@@ -20,7 +20,6 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import com.google.android.gms.cast.framework.CastButtonFactory
 import com.google.android.gms.cast.framework.CastContext
-import com.streamsphere.app.data.cast.CastRepository
 import com.streamsphere.app.ui.navigation.*
 import com.streamsphere.app.ui.screens.*
 import com.streamsphere.app.ui.theme.StreamSphereTheme
@@ -39,19 +38,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private val settingsViewModel: SettingsViewModel by viewModels()
-    @Inject lateinit var castRepository: CastRepository
-    private var castContext: CastContext? = null
-
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()   // install but don't hold a reference — not needed
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        castContext = try {
-            CastContext.getSharedInstance(this)
-        } catch (e: Exception) {
-            null
-        }
 
         val startChannelId  = intent?.getStringExtra(EXTRA_CHANNEL_ID)
         val startFullscreen = intent?.getBooleanExtra(EXTRA_FULLSCREEN, false) ?: false
@@ -76,20 +67,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        castRepository.registerSessionListener()
-    }
-
-    override fun onPause() {
-        castRepository.unregisterSessionListener()
-        super.onPause()
-    }
-
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         super.onCreateOptionsMenu(menu)
         menuInflater.inflate(R.menu.browse, menu)
-        CastButtonFactory.setUpMediaRouteButton(applicationContext, menu, R.id.media_route_menu_item)
         return true
     }
 }
