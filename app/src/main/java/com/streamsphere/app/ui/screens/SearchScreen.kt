@@ -64,7 +64,7 @@ fun SearchScreen(
                             ChannelCard(
                                 model            = ch,
                                 onFavouriteClick = { viewModel.toggleFavourite(ch) },
-                                onWidgetClick    = { viewModel.toggleWidget(ch) },
+                                onPinShortcut   = { viewmodel.pinShortcut(ch) },
                                 onCardClick      = { onChannelClick(ch.id) }
                             )
                         }
