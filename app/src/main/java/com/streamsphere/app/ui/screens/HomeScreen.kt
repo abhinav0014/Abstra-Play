@@ -99,7 +99,7 @@ private fun ChannelListContent(
     onTabSelected: (ChannelTab) -> Unit,
     onSearchQuery: (String) -> Unit,
     onFavourite: (ChannelUiModel) -> Unit,
-    onWidget: (ChannelUiModel) -> Unit,
+    onPinShortcut: (ChannelUiModel) -> Unit,
     onCardClick: (String) -> Unit
 ) {
     val counts = remember(allChannels) {
@@ -144,7 +144,7 @@ private fun ChannelListContent(
                     ChannelCard(
                         model            = ch,
                         onFavouriteClick = { onFavourite(ch) },
-                        onWidgetClick    = { onWidget(ch) },
+                        onPinShortcut    = { onPinShortcut(ch) },
                         onCardClick      = { onCardClick(ch.id) }
                     )
                 }
