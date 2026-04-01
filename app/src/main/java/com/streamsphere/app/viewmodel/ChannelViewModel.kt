@@ -1,17 +1,21 @@
 package com.streamsphere.app.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.streamsphere.app.data.model.*
 import com.streamsphere.app.data.repository.ChannelRepository
+import com.streamsphere.app.util.ShortcutHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class ChannelViewModel @Inject constructor(
-    private val repo: ChannelRepository
+    private val repo: ChannelRepository,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState<List<ChannelUiModel>>>(UiState.Loading)
@@ -23,37 +27,32 @@ class ChannelViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    /** Stores user-chosen stream index per channel id. Survives tab/search changes. */
     private val _streamSelections = MutableStateFlow<Map<String, Int>>(emptyMap())
+
+    /** Emits a one-shot message to be shown as a Snackbar (null = nothing pending). */
+    private val _shortcutMessage = MutableStateFlow<String?>(null)
+    val shortcutMessage: StateFlow<String?> = _shortcutMessage.asStateFlow()
 
     val favourites: StateFlow<List<FavouriteChannel>> =
         repo.getAllFavourites()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val widgetChannels: StateFlow<List<FavouriteChannel>> =
-        repo.getWidgetChannels()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    // kotlinx.coroutines combine() only accepts up to 5 parameters directly.
-    // Nest two combine() calls to merge 6 flows without an array-based overload.
     val filteredChannels: StateFlow<List<ChannelUiModel>> =
         combine(
             combine(_uiState, _selectedTab, _searchQuery) { state, tab, query ->
                 Triple(state, tab, query)
             },
-            combine(favourites, widgetChannels, _streamSelections) { favs, widgets, sels ->
-                Triple(favs, widgets, sels)
+            combine(favourites, _streamSelections) { favs, sels ->
+                Pair(favs, sels)
             }
-        ) { (state, tab, query), (favs, widgets, selections) ->
-            val favIds    = favs.map { it.id }.toSet()
-            val widgetIds = widgets.map { it.id }.toSet()
+        ) { (state, tab, query), (favs, selections) ->
+            val favIds = favs.map { it.id }.toSet()
             val all = (state as? UiState.Success<List<ChannelUiModel>>)?.data
                 ?: return@combine emptyList()
 
             all.map { ch ->
                 ch.copy(
                     isFavourite         = ch.id in favIds,
-                    isWidget            = ch.id in widgetIds,
                     selectedStreamIndex = selections[ch.id] ?: 0
                 )
             }.filter { ch ->
@@ -84,10 +83,9 @@ class ChannelViewModel @Inject constructor(
         }
     }
 
-    fun selectTab(tab: ChannelTab) { _selectedTab.value = tab }
-    fun setSearchQuery(q: String)  { _searchQuery.value = q }
+    fun selectTab(tab: ChannelTab)  { _selectedTab.value  = tab }
+    fun setSearchQuery(q: String)   { _searchQuery.value  = q   }
 
-    /** Called when user picks a feed/stream from the picker. */
     fun selectStream(channelId: String, index: Int) {
         _streamSelections.value = _streamSelections.value + (channelId to index)
     }
@@ -96,10 +94,21 @@ class ChannelViewModel @Inject constructor(
         viewModelScope.launch { repo.toggleFavourite(model) }
     }
 
-    fun toggleWidget(model: ChannelUiModel) {
+    /**
+     * Requests the launcher to pin a home-screen shortcut for [model].
+     * The shortcut launches the fullscreen player directly.
+     */
+    fun pinShortcut(model: ChannelUiModel) {
         viewModelScope.launch {
-            if (!model.isFavourite) repo.toggleFavourite(model)
-            repo.toggleWidget(model.id, model.isWidget)
+            val supported = ShortcutHelper.pinChannelShortcut(appContext, model)
+            _shortcutMessage.value = if (supported) {
+                "Shortcut request sent — check your launcher prompt"
+            } else {
+                "Your launcher doesn't support pinned shortcuts"
+            }
         }
     }
+
+    /** Call after the Snackbar has been shown to clear the pending message. */
+    fun onShortcutMessageConsumed() { _shortcutMessage.value = null }
 }
