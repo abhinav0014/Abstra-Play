@@ -90,6 +90,7 @@ data class FavouriteChannel(
     val categories: String,
     val logoUrl: String? = null,
     val streamUrl: String? = null,
+    // kept for DB schema compatibility — no longer surfaced in UI
     val isWidget: Boolean = false,
     val addedAt: Long = System.currentTimeMillis()
 )
@@ -105,8 +106,7 @@ data class ChannelUiModel(
     val streamOptions: List<StreamOption>,
     /** Index into streamOptions that is currently active. */
     val selectedStreamIndex: Int = 0,
-    val isFavourite: Boolean = false,
-    val isWidget: Boolean = false
+    val isFavourite: Boolean = false
 ) {
     val streamUrl: String?
         get() = streamOptions.getOrNull(selectedStreamIndex)?.url
