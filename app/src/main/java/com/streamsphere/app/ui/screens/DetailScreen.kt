@@ -91,6 +91,16 @@ fun DetailScreen(
     val channels by viewModel.filteredChannels.collectAsState()
     val channel  = remember(channels, channelId) { channels.find { it.id == channelId } }
 
+    // Shortcut feedback snackbar
+    val shortcutMessage by viewModel.shortcutMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(shortcutMessage) {
+        shortcutMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.onShortcutMessageConsumed()
+        }
+    }
+
     var isFullscreen by remember { mutableStateOf(startInFullscreen) }
 
     if (isFullscreen) {
@@ -99,12 +109,13 @@ fun DetailScreen(
                 channel          = ch,
                 onExitFullscreen = { isFullscreen = false },
                 onFavourite      = { viewModel.toggleFavourite(ch) },
-                onWidget         = { viewModel.toggleWidget(ch) },
+                onPinShortcut    = { viewModel.pinShortcut(ch) },
                 onSelectStream   = { idx -> viewModel.selectStream(ch.id, idx) }
             )
         }
     } else {
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     title = { Text(channel?.name ?: "Channel") },
@@ -137,7 +148,7 @@ fun DetailScreen(
                 DetailContent(
                     channel           = channel,
                     autoPlay          = autoPlay,
-                    onWidget          = { viewModel.toggleWidget(channel) },
+                    onPinShortcut     = { viewModel.pinShortcut(channel) },
                     onEnterFullscreen = { isFullscreen = true },
                     onSelectStream    = { idx -> viewModel.selectStream(channel.id, idx) },
                     modifier          = Modifier.padding(padding)
@@ -156,7 +167,7 @@ fun DetailScreen(
 private fun DetailContent(
     channel: ChannelUiModel,
     autoPlay: Boolean,
-    onWidget: () -> Unit,
+    onPinShortcut: () -> Unit,
     onEnterFullscreen: () -> Unit,
     onSelectStream: (Int) -> Unit,
     modifier: Modifier = Modifier
@@ -350,15 +361,14 @@ private fun DetailContent(
                 }
             }
             OutlinedButton(
-                onClick  = onWidget,
+                onClick  = onPinShortcut,
                 modifier = Modifier.fillMaxWidth(),
-                border   = BorderStroke(1.dp, if (channel.isWidget) catColor else MaterialTheme.colorScheme.outline.copy(0.5f)),
-                colors   = ButtonDefaults.outlinedButtonColors(
-                    contentColor = if (channel.isWidget) catColor else MaterialTheme.colorScheme.onSurfaceVariant)
+                border   = BorderStroke(1.dp, Primary.copy(alpha = 0.5f)),
+                colors   = ButtonDefaults.outlinedButtonColors(contentColor = Primary)
             ) {
-                Icon(if (channel.isWidget) Icons.Filled.Widgets else Icons.Outlined.Widgets, null)
+                Icon(Icons.Outlined.AddToHomeScreen, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text(if (channel.isWidget) "Remove from Widget" else "Add to Home Screen Widget")
+                Text("Add Shortcut to Home Screen")
             }
             Spacer(Modifier.height(8.dp))
         }
@@ -680,7 +690,7 @@ private fun FullscreenPlayer(
     channel: ChannelUiModel,
     onExitFullscreen: () -> Unit,
     onFavourite: () -> Unit,
-    onWidget: () -> Unit,
+    onPinShortcut: () -> Unit,
     onSelectStream: (Int) -> Unit
 ) {
     val context   = LocalContext.current
@@ -964,6 +974,16 @@ private fun FullscreenControls(
                     tint               = if (isRotLocked) catColor else Color.White
                 )
             }
+
+            //Add widget or pin shortcut icon
+            IconButton(onClick = onPinShortcut) {
+                Icon(
+                    imageVector        = Icons.Outlined.AddToHomeScreen,
+                    contentDescription = "Pin to home screen",
+                    tint               = Color.White
+                )
+            }
+            
             // Screen lock
             IconButton(onClick = onLock) {
                 Icon(Icons.Outlined.LockOpen, "Lock", tint = Color.White)
