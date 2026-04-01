@@ -27,19 +27,15 @@ class ChannelRepository @Inject constructor(
     suspend fun getLanguages(): List<Language> = cachedLanguages ?: api.getLanguages().also{ cachedLanguages = it }
 
     suspend fun buildChannelUiModels(
-        favouriteIds: Set<String> = emptySet(),
-        widgetIds:    Set<String> = emptySet()
+        favouriteIds: Set<String> = emptySet()
     ): List<ChannelUiModel> {
         val channels  = getChannels()
         val allStreams = getStreams()
         val logos     = getLogos().groupBy { it.channel }
         val countries = getCountries().associateBy { it.code }
-        // feeds keyed by (channelId, feedId)
         val feedMap   = getFeeds().groupBy { it.channel }
-        // languages keyed by ISO 639-3 code
         val langMap   = getLanguages().associateBy { it.code }
 
-        // streams grouped by channel id
         val streamsByChannel = allStreams.groupBy { it.channel }
 
         val targetCountries  = setOf("NP", "IN")
@@ -48,16 +44,15 @@ class ChannelRepository @Inject constructor(
         return channels
             .filter { ch ->
                 !ch.isNsfw && ch.closed == null &&
-                streamsByChannel.containsKey(ch.id) &&      // only live channels
+                streamsByChannel.containsKey(ch.id) &&
                 (ch.country in targetCountries || ch.categories.any { it in targetCategories })
             }
             .map { ch ->
-                val country     = countries[ch.country]
-                val logo        = logos[ch.id]?.firstOrNull()
-                val chStreams    = streamsByChannel[ch.id] ?: emptyList()
-                val chFeeds     = feedMap[ch.id]?.associateBy { it.id } ?: emptyMap()
+                val country  = countries[ch.country]
+                val logo     = logos[ch.id]?.firstOrNull()
+                val chStreams = streamsByChannel[ch.id] ?: emptyList()
+                val chFeeds  = feedMap[ch.id]?.associateBy { it.id } ?: emptyMap()
 
-                // Build StreamOption list, sorted: main feed first, then by feed name
                 val options = chStreams
                     .map { stream ->
                         val feed = stream.feed?.let { chFeeds[it] }
@@ -74,9 +69,8 @@ class ChannelRepository @Inject constructor(
                             isMain        = feed?.isMain ?: (stream.feed == null)
                         )
                     }
-                    // main / no-feed first, then alphabetically by feedName
                     .sortedWith(compareByDescending<StreamOption> { it.isMain }.thenBy { it.feedName })
-                    .distinctBy { it.url }   // deduplicate identical URLs
+                    .distinctBy { it.url }
 
                 ChannelUiModel(
                     id                  = ch.id,
@@ -87,8 +81,7 @@ class ChannelRepository @Inject constructor(
                     logoUrl             = logo?.url,
                     streamOptions       = options,
                     selectedStreamIndex = 0,
-                    isFavourite         = ch.id in favouriteIds,
-                    isWidget            = ch.id in widgetIds
+                    isFavourite         = ch.id in favouriteIds
                 )
             }
             .distinctBy { it.id }
@@ -96,9 +89,8 @@ class ChannelRepository @Inject constructor(
 
     // ── Favourites ────────────────────────────────────────────────────────────
 
-    fun getAllFavourites():   Flow<List<FavouriteChannel>> = db.favouritesDao().getAllFavourites()
-    fun getWidgetChannels():  Flow<List<FavouriteChannel>> = db.favouritesDao().getWidgetChannels()
-    fun isFavourite(id: String): Flow<Boolean>            = db.favouritesDao().isFavourite(id)
+    fun getAllFavourites(): Flow<List<FavouriteChannel>> = db.favouritesDao().getAllFavourites()
+    fun isFavourite(id: String): Flow<Boolean>          = db.favouritesDao().isFavourite(id)
 
     suspend fun toggleFavourite(model: ChannelUiModel) {
         if (model.isFavourite) {
@@ -115,9 +107,5 @@ class ChannelRepository @Inject constructor(
                 )
             )
         }
-    }
-
-    suspend fun toggleWidget(id: String, current: Boolean) {
-        db.favouritesDao().updateWidgetStatus(id, !current)
     }
 }
