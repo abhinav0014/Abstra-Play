@@ -4,8 +4,6 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,18 +21,22 @@ fun FavouritesScreen(
     onChannelClick: (String) -> Unit,
     viewModel: ChannelViewModel = hiltViewModel()
 ) {
-    val favourites     by viewModel.favourites.collectAsState()
-    val allChannels    by viewModel.filteredChannels.collectAsState()
-    val widgetChannels by viewModel.widgetChannels.collectAsState()
+    val favourites  by viewModel.favourites.collectAsState()
+    val allChannels by viewModel.filteredChannels.collectAsState()
+
+    // Snackbar for shortcut feedback
+    val shortcutMessage   by viewModel.shortcutMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(shortcutMessage) {
+        shortcutMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.onShortcutMessageConsumed()
+        }
+    }
 
     val favModels = remember(favourites, allChannels) {
         favourites.mapNotNull { fav ->
-            // Prefer the enriched model from the live channel list (has full streamOptions).
-            // Fall back to a minimal model built from the Room record if the channel
-            // isn't in the current filtered list (e.g. after clearing search).
             allChannels.find { it.id == fav.id } ?: run {
-                // Build a single StreamOption from the stored streamUrl so the
-                // card/detail still works without crashing.
                 val options = if (fav.streamUrl != null) {
                     listOf(
                         StreamOption(
@@ -60,14 +62,14 @@ fun FavouritesScreen(
                     logoUrl             = fav.logoUrl,
                     streamOptions       = options,
                     selectedStreamIndex = 0,
-                    isFavourite         = true,
-                    isWidget            = fav.isWidget
+                    isFavourite         = true
                 )
             }
         }
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -99,8 +101,8 @@ fun FavouritesScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "Tap the heart icon on any channel to save it here.",
-                        style    = MaterialTheme.typography.bodyMedium,
-                        color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style     = MaterialTheme.typography.bodyMedium,
+                        color     = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -115,32 +117,6 @@ fun FavouritesScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (widgetChannels.isNotEmpty()) {
-                    item {
-                        Text(
-                            "📱 Widget Channels",
-                            style    = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-                    }
-                    items(widgetChannels, key = { "widget_${it.id}" }) { fav ->
-                        val model = favModels.find { it.id == fav.id } ?: return@items
-                        ChannelCard(
-                            model            = model,
-                            onFavouriteClick = { viewModel.toggleFavourite(model) },
-                            onWidgetClick    = { viewModel.toggleWidget(model) },
-                            onCardClick      = { onChannelClick(model.id) }
-                        )
-                    }
-                    item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp)) }
-                    item {
-                        Text(
-                            "⭐ All Favourites",
-                            style    = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-                    }
-                }
                 items(favModels, key = { it.id }) { model ->
                     AnimatedVisibility(
                         visible = true,
@@ -149,7 +125,7 @@ fun FavouritesScreen(
                         ChannelCard(
                             model            = model,
                             onFavouriteClick = { viewModel.toggleFavourite(model) },
-                            onWidgetClick    = { viewModel.toggleWidget(model) },
+                            onPinShortcut    = { viewModel.pinShortcut(model) },
                             onCardClick      = { onChannelClick(model.id) }
                         )
                     }
