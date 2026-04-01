@@ -28,7 +28,7 @@ import com.streamsphere.app.ui.theme.*
 fun ChannelCard(
     model: ChannelUiModel,
     onFavouriteClick: () -> Unit,
-    onWidgetClick: () -> Unit,
+    onPinShortcut: () -> Unit,
     onCardClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -41,18 +41,23 @@ fun ChannelCard(
     }
 
     Card(
-        onClick = onCardClick,
-        modifier = modifier.fillMaxWidth(),
-        shape    = RoundedCornerShape(16.dp),
-        colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        onClick   = onCardClick,
+        modifier  = modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp, pressedElevation = 4.dp),
-        border   = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+        border    = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 LogoImage(logoUrl = model.logoUrl, name = model.name, color = categoryColor)
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = model.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        text     = model.name,
+                        style    = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text  = "${model.countryFlag} ${model.country}",
@@ -65,12 +70,14 @@ fun ChannelCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 model.categories.take(2).forEach { cat -> CategoryChip(cat, categoryColor) }
                 Spacer(modifier = Modifier.weight(1f))
-                if (model.isFavourite) {
-                    AnimatedWidgetButton(isWidget = model.isWidget, onClick = onWidgetClick)
-                }
+                // Pin-to-home-screen button (replaces old widget button)
+                PinShortcutButton(onClick = onPinShortcut)
                 if (model.streamUrl != null) LiveBadge()
             }
         }
@@ -89,12 +96,17 @@ fun LogoImage(logoUrl: String?, name: String, color: Color) {
     ) {
         if (logoUrl != null) {
             AsyncImage(
-                model = logoUrl, contentDescription = name,
+                model        = logoUrl,
+                contentDescription = name,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().padding(6.dp)
+                modifier     = Modifier.fillMaxSize().padding(6.dp)
             )
         } else {
-            Text(text = name.firstOrNull()?.toString() ?: "?", style = MaterialTheme.typography.titleLarge, color = color)
+            Text(
+                text  = name.firstOrNull()?.toString() ?: "?",
+                style = MaterialTheme.typography.titleLarge,
+                color = color
+            )
         }
     }
 }
@@ -103,8 +115,11 @@ fun LogoImage(logoUrl: String?, name: String, color: Color) {
 fun AnimatedFavButton(isFavourite: Boolean, onClick: () -> Unit) {
     val scale by animateFloatAsState(
         targetValue   = if (isFavourite) 1.2f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
-        label         = "fav_scale"
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness    = Spring.StiffnessHigh
+        ),
+        label = "fav_scale"
     )
     IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
         Icon(
@@ -116,17 +131,17 @@ fun AnimatedFavButton(isFavourite: Boolean, onClick: () -> Unit) {
     }
 }
 
+/**
+ * Small button that asks the launcher to pin a shortcut for this channel.
+ * Uses the standard AddToHomeScreen icon.
+ */
 @Composable
-fun AnimatedWidgetButton(isWidget: Boolean, onClick: () -> Unit) {
-    val color by animateColorAsState(
-        targetValue = if (isWidget) Primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        label       = "widget_color"
-    )
+fun PinShortcutButton(onClick: () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.size(28.dp)) {
         Icon(
-            imageVector        = if (isWidget) Icons.Filled.Widgets else Icons.Outlined.Widgets,
-            contentDescription = "Add to Widget",
-            tint               = color,
+            imageVector        = Icons.Outlined.AddToHomeScreen,
+            contentDescription = "Pin to home screen",
+            tint               = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier           = Modifier.size(18.dp)
         )
     }
@@ -151,7 +166,7 @@ fun CategoryChip(category: String, color: Color) {
 @Composable
 fun LiveBadge() {
     Row(
-        verticalAlignment    = Alignment.CenterVertically,
+        verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         modifier = Modifier
             .background(Color(0xFFE53E3E).copy(alpha = 0.1f), RoundedCornerShape(20.dp))
@@ -165,7 +180,11 @@ fun LiveBadge() {
             animationSpec = infiniteRepeatable(animation = tween(800), repeatMode = RepeatMode.Reverse),
             label         = "live_alpha"
         )
-        Box(modifier = Modifier.size(5.dp).background(Color(0xFFE53E3E).copy(alpha = alpha), CircleShape))
+        Box(
+            modifier = Modifier
+                .size(5.dp)
+                .background(Color(0xFFE53E3E).copy(alpha = alpha), CircleShape)
+        )
         Text(text = "LIVE", style = MaterialTheme.typography.labelSmall, color = Color(0xFFE53E3E))
     }
 }
