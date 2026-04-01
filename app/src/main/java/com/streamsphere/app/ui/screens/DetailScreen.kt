@@ -867,6 +867,7 @@ private fun FullscreenPlayer(
                     onForward        = { exoPlayer?.seekForward() },
                     onExitFullscreen = onExitFullscreen,
                     onLock           = { isLocked = true; showControls = false },
+                    onPinShortcut    = onPinShortcut,
                     onToggleRot      = {
                         isRotLocked = !isRotLocked
                         activity.requestedOrientation = if (isRotLocked)
@@ -916,6 +917,7 @@ private fun FullscreenControls(
     onForward: () -> Unit,
     onExitFullscreen: () -> Unit,
     onLock: () -> Unit,
+    onPinShortcut: () -> Unit,
     onToggleRot: () -> Unit,
     onOpenFeedPicker: (() -> Unit)?,
     onOpenAudioPicker: (() -> Unit)?
