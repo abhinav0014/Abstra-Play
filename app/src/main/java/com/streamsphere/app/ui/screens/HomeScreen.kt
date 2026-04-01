@@ -80,7 +80,7 @@ fun HomeScreen(
                     onTabSelected = viewModel::selectTab,
                     onSearchQuery = viewModel::setSearchQuery,
                     onFavourite   = viewModel::toggleFavourite,
-                    onWidget      = viewModel::toggleWidget,
+                    onPinShortcut = viewModel::pinShortcut,
                     onCardClick   = onChannelClick
                 )
             }
