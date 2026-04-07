@@ -4,52 +4,67 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.airbnb.lottie.compose.*
-import com.streamsphere.app.R
 
-/**
- * A dedicated Splash Screen component that plays the StreamSphere Lottie animation.
- * Once the animation finishes, it triggers [onFinished] to navigate to the main app.
- */
 @Composable
-fun LottieSplashScreen(onFinished: () -> Unit) {
-    // 1. Load the composition from your res/raw/streamsphere.json
-    val composition by rememberLottieComposition(
-        LottieCompositionSpec.RawRes(R.raw.streamsphere) 
+fun LottieSplashScreen(onAnimationsComplete: () -> Unit) {
+
+    // --- Frame 2 (background) state ---
+    val frame2Composition by rememberLottieComposition(
+        LottieCompositionSpec.Asset("splash_frame2.json")
     )
-    
-    // 2. Control the animation state
-    val progress by animateLottieCompositionAsState(
-        composition = composition,
-        iterations = 1, // Plays exactly once
-        restartOnPlay = false
+    val frame2Progress by animateLottieCompositionAsState(
+        composition = frame2Composition,
+        iterations = 1,
+        isPlaying = true
     )
 
-    // 3. The UI Layout
+    // --- Frame 1 (foreground) state ---
+    val frame1Composition by rememberLottieComposition(
+        LottieCompositionSpec.Asset("splash_frame1.json")
+    )
+    val frame1Progress by animateLottieCompositionAsState(
+        composition = frame1Composition,
+        iterations = 1,
+        isPlaying = true
+    )
+
+    // Navigate when BOTH reach the end (progress == 1f)
+    val frame1Done = frame1Progress == 1f && frame1Composition != null
+    val frame2Done = frame2Progress == 1f && frame2Composition != null
+
+    LaunchedEffect(frame1Done, frame2Done) {
+        if (frame1Done && frame2Done) {
+            onAnimationsComplete()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black), // Matches your system splash background
-        contentAlignment = Alignment.Center
+            .background(Color.Black)
     ) {
-        LottieAnimation(
-            composition = composition,
-            progress = { progress },
-            modifier = Modifier.size(300.dp) // Adjust size as needed
-        )
-    }
 
-    // 4. Trigger the transition to Main UI when animation hits 100%
-    if (progress == 1f) {
-        LaunchedEffect(Unit) {
-            onFinished()
-        }
+        // FRAME 2 — full screen, behind everything
+        LottieAnimation(
+            composition = frame2Composition,
+            progress = { frame2Progress },
+            modifier = Modifier.fillMaxSize(),
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+        )
+
+        // FRAME 1 — fixed size, centered, on top
+        LottieAnimation(
+            composition = frame1Composition,
+            progress = { frame1Progress },
+            modifier = Modifier
+                .size(280.dp)
+                .align(Alignment.Center)
+        )
     }
 }
