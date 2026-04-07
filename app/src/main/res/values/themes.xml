@@ -5,10 +5,12 @@
         <item name="android:statusBarColor">@color/background</item>
         <item name="android:navigationBarColor">@color/surface</item>
     </style>
+
     <style name="Theme.StreamSphere.Splash" parent="Theme.SplashScreen">
-        <item name="android:windowBackground">#ffffff</item>
-        <item name="windowSplashScreenBackground">@color/surface</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <!-- Match your Lottie background color so there's no flash -->
+        <item name="windowSplashScreenBackground">@color/background</item>
+        <!-- Remove the static icon — Lottie handles the animation -->
+        <item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>
         <item name="postSplashScreenTheme">@style/Theme.StreamSphere</item>
     </style>
 </resources>
