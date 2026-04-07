@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
 
             StreamSphereTheme(darkTheme = darkMode) {
                 if (showLottieSplash) {
-                    LottieSplashScreen(onFinished = {
+                    LottieSplashScreen(onAnimationsComplete = {
                         showLottieSplash = false
                     })
                 } else {
