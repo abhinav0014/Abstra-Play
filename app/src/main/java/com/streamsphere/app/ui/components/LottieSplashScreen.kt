@@ -39,11 +39,11 @@ fun LottieSplashScreen(onAnimationsComplete: () -> Unit) {
     )
 
     // Completion Logic
-    val frame1Done = frame1Progress == 1f && frame1Composition != null
-    val frame2Done = frame2Progress == 1f && frame2Composition != null
-
-    LaunchedEffect(frame1Done, frame2Done) {
-        if (frame1Done && frame2Done) {
+    val frame2Done = frame2Progress >= 1f && frame2Composition != null
+    val frame1Done = frame1Progress >= 1f && frame1Composition != null
+    
+    LaunchedEffect(frame2Done, frame1Done) {
+        if (frame2Done && frame1Done) {
             onAnimationsComplete()
         }
     }
@@ -59,7 +59,6 @@ fun LottieSplashScreen(onAnimationsComplete: () -> Unit) {
             progress = { frame2Progress },
             modifier = Modifier
                 .fillMaxSize()
-                .zIndex(1f), // Explicit lower depth
             contentScale = ContentScale.Crop
         )
 
@@ -70,7 +69,6 @@ fun LottieSplashScreen(onAnimationsComplete: () -> Unit) {
             modifier = Modifier
                 .align(Alignment.Center)
                 .size(280.dp)
-                .zIndex(2f) // Ensures it stays on top
                 .clip(CircleShape) // Makes the frame appear circular
                 .background(Color.Transparent), // Ensures the frame container doesn't block background
             contentScale = ContentScale.Fit
