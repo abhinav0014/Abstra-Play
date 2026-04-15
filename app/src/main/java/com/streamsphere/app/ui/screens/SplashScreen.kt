@@ -23,25 +23,13 @@ fun SplashScreen(onAnimationsComplete: () -> Unit) {
         iterations = 1,
         isPlaying = true
     )
-
-    // --- Frame 1 (foreground) state ---
-    val frame1Composition by rememberLottieComposition(
-        LottieCompositionSpec.Asset("splash_frame1.json")
-    )
-    val frame1Progress by animateLottieCompositionAsState(
-        composition = frame1Composition,
-        iterations = 1,
-        isPlaying = true
-    )
-
-    // Navigate when BOTH reach the end (progress == 1f)
-    val frame1Done = frame1Progress == 1f && frame1Composition != null
-    val frame2Done = frame2Progress == 1f && frame2Composition != null
-
-    LaunchedEffect(frame1Done, frame2Done) {
-        if (frame1Done && frame2Done) {
-            onAnimationsComplete()
-        }
+    
+    val frame2Done = frame2Composition != null && frame2Progress >= 0.99f
+    
+    LaunchedEffect(frame2Progress) {
+    if (frame2Done) {
+        onAnimationsComplete()
+    }
     }
 
     Box(
@@ -56,15 +44,6 @@ fun SplashScreen(onAnimationsComplete: () -> Unit) {
             progress = { frame2Progress },
             modifier = Modifier.fillMaxSize(),
             contentScale = androidx.compose.ui.layout.ContentScale.Crop
-        )
-
-        // FRAME 1 — fixed size, centered, on top
-        LottieAnimation(
-            composition = frame1Composition,
-            progress = { frame1Progress },
-            modifier = Modifier
-                .size(280.dp)
-                .align(Alignment.Center)
         )
     }
 }
